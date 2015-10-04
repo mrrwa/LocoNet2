@@ -119,6 +119,7 @@ typedef enum
 class LocoNetThrottleClass;
 class LocoNetFastClockClass;
 class LocoNetSystemVariableClass;
+class LocoNetCVClass;
 
 class LocoNetClass
 {
@@ -132,6 +133,7 @@ class LocoNetClass
 		uint8_t 										processSwitchSensorMessage( lnMsg *LnPacket );
 		LocoNetFastClockClass				*pFastClock;
 		LocoNetSystemVariableClass	*pSv;
+		LocoNetCVClass							*pCv;
 		LocoNetThrottleClass				*pThrottle;
 
   public:
@@ -140,7 +142,7 @@ class LocoNetClass
     LN_STATUS   			send(lnMsg *TxPacket, uint8_t PrioDelay);
     LN_STATUS   			send(uint8_t OpCode, uint8_t Data1, uint8_t Data2);
     LN_STATUS   			send(uint8_t OpCode, uint8_t Data1, uint8_t Data2, uint8_t PrioDelay);
-    virtual LN_STATUS sendLocoNetPacketTry(lnMsg *TxData, unsigned char ucPrioDelay) = 0 ;
+    virtual LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay) = 0 ;
     
     LnRxStats* getRxStats(void);
     LnTxStats* getTxStats(void);
@@ -349,19 +351,25 @@ typedef enum
 
 typedef enum
 {
-  SV_OK = 0,
-  SV_ERROR = 1,
-  SV_DEFERRED_PROCESSING_NEEDED = 2
+  SV_NOT_CONSUMED = 0,
+  SV_CONSUMED_OK = 1,
+  SV_ERROR = 2,
+  SV_DEFERRED_PROCESSING_NEEDED = 3
 } SV_STATUS ;
+
+#define SV_MANUFACTURER_DIY		13
 
 class LocoNetSystemVariableClass
 {
+	friend class LocoNetClass;
   private:
-	uint16_t 			vendorId ;
-	uint16_t 			deviceId ;
-  uint8_t     	swVersion ;
-  LocoNetClass	*lnInstance ;
-    
+	uint8_t 	mfgId ;
+	uint8_t 	devId ;
+	uint16_t 	productId ;
+  uint8_t   swVersion ;
+  
+  LocoNetClass *lnInstance ;
+  
   uint8_t DeferredProcessingRequired ;
   uint8_t DeferredSrcAddr ;
     
@@ -426,7 +434,7 @@ class LocoNetSystemVariableClass
     bool CheckAddressRange(uint16_t startAddress, uint8_t Count);
 
   public:
-	void init(LocoNetClass *lnInstance, uint16_t newVendorId, uint16_t newDeviceId, uint8_t newSwVersion);
+	void init(LocoNetClass *lnInstance, uint8_t newMfgId, uint8_t newDevId, uint16_t newProductId, uint8_t newSwVersion);
 	
 	/**
 	 * Check whether a message is an SV programming message. If so, the message

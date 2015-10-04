@@ -329,16 +329,14 @@ typedef struct
 {
   uint16_t rxPackets ;
   uint16_t rxErrors ;
-} 
-LnRxStats ;
+}LnRxStats ;
 
 typedef struct
 {
   uint16_t txPackets ;
   uint16_t txErrors ;
   uint16_t collisions ;
-} 
-LnTxStats ;
+}LnTxStats ;
 
 /* Locomotive Address Message */
 typedef struct locoadr_t {

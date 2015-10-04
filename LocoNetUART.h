@@ -71,7 +71,7 @@ class LocoNetUartClass: public LocoNetClass
 {
 	public:
 		void init();
-		LN_STATUS sendLocoNetPacketTry(lnMsg *TxData, unsigned char ucPrioDelay);
+		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
 };
 
 #endif
