@@ -4,9 +4,6 @@
 /****************************************************************************
  * 	Copyright (C) 2015 Alex Shepherd
  * 
- * 	Portions Copyright (C) Digitrax Inc.
- * 	Portions Copyright (C) Uhlenbrock Elektronik GmbH
- * 
  * 	This library is free software; you can redistribute it and/or
  * 	modify it under the terms of the GNU Lesser General Public
  * 	License as published by the Free Software Foundation; either
@@ -21,31 +18,6 @@
  * 	License along with this library; if not, write to the Free Software
  * 	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
- *****************************************************************************
- * 
- * 	IMPORTANT:
- * 
- * 	Some of the message formats used in this code are Copyright Digitrax, Inc.
- * 	and are used with permission as part of the MRRwA (previously EmbeddedLocoNet) project.
- *  That permission does not extend to uses in other software products. If you wish
- * 	to use this code, algorithm or these message formats outside of
- * 	MRRwA, please contact Digitrax Inc, for specific permission.
- * 
- * 	Note: The sale any LocoNet device hardware (including bare PCB's) that
- * 	uses this or any other LocoNet software, requires testing and certification
- * 	by Digitrax Inc. and will be subject to a licensing agreement.
- * 
- * 	Please contact Digitrax Inc. for details.
- * 
- *****************************************************************************
- * 
- * 	IMPORTANT:
- * 
- * 	Some of the message formats used in this code are Copyright Uhlenbrock Elektronik GmbH
- * 	and are used with permission as part of the MRRwA (previously EmbeddedLocoNet) project.
- *  That permission does not extend to uses in other software products. If you wish
- * 	to use this code, algorithm or these message formats outside of
- * 	MRRwA, please contact Copyright Uhlenbrock Elektronik GmbH, for specific permission.
  * 
  *****************************************************************************
  * 	DESCRIPTION
@@ -67,11 +39,29 @@
 
 #include "utility/LocoNet.h"
 
+#define RX_BUFFER_SIZE	64
+
+extern "C" void USART_TX_vect(void) __attribute__ ((signal));
+
 class LocoNetUartClass: public LocoNetClass
 {
+	private:
+		volatile uint8_t  lnState ;
+		volatile uint8_t  lnBitCount ;
+		volatile uint8_t  lnCurrentByte ;
+		volatile uint16_t lnCompareTarget ;
+		
+		volatile uint8_t	rxHead;
+		volatile uint8_t	rxTail;
+		uint8_t						rxBuffer[RX_BUFFER_SIZE];
+				
 	public:
 		void init();
+		void process();
 		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
+		
+	friend:
+		
 };
 
 #endif
