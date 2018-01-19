@@ -111,7 +111,10 @@ lnMsg *LocoNetMessageBufferClass::addByte(uint8_t newByte )
 		}
 		
 		buffer[ index++ ] = newByte ;
-		checkSum ^= newByte;
+		if((index <= 2 ) || (index < expLen))
+    	{
+      		checkSum ^= newByte;
+    	}
 	}
 	
 	return getMsg();
