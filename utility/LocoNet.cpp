@@ -1,72 +1,78 @@
 /****************************************************************************
  * 	Copyright (C) 2009..2013 Alex Shepherd
  *	Copyright (C) 2013 Damian Philipp
- * 
+ *
  * 	Portions Copyright (C) Digitrax Inc.
  *	Portions Copyright (C) Uhlenbrock Elektronik GmbH
- * 
+ *
  * 	This library is free software; you can redistribute it and/or
  * 	modify it under the terms of the GNU Lesser General Public
  * 	License as published by the Free Software Foundation; either
  * 	version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * 	This library is distributed in the hope that it will be useful,
  * 	but WITHOUT ANY WARRANTY; without even the implied warranty of
  * 	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * 	Lesser General Public License for more details.
- * 
+ *
  * 	You should have received a copy of the GNU Lesser General Public
  * 	License along with this library; if not, write to the Free Software
  * 	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- * 
+ *
  *****************************************************************************
- * 
+ *
  * 	IMPORTANT:
- * 
+ *
  * 	Some of the message formats used in this code are Copyright Digitrax, Inc.
  * 	and are used with permission as part of the MRRwA (previously EmbeddedLocoNet) project.
  *  That permission does not extend to uses in other software products. If you wish
  * 	to use this code, algorithm or these message formats outside of
  * 	MRRwA, please contact Digitrax Inc, for specific permission.
- * 
+ *
  * 	Note: The sale any LocoNet device hardware (including bare PCB's) that
  * 	uses this or any other LocoNet software, requires testing and certification
  * 	by Digitrax Inc. and will be subject to a licensing agreement.
- * 
+ *
  * 	Please contact Digitrax Inc. for details.
- * 
+ *
  *****************************************************************************
- * 
+ *
  * 	IMPORTANT:
- * 
+ *
  * 	Some of the message formats used in this code are Copyright Uhlenbrock Elektronik GmbH
  * 	and are used with permission as part of the MRRwA (previously EmbeddedLocoNet) project.
  *  That permission does not extend to uses in other software products. If you wish
  * 	to use this code, algorithm or these message formats outside of
  * 	MRRwA, please contact Copyright Uhlenbrock Elektronik GmbH, for specific permission.
- * 
+ *
  *****************************************************************************
  * 	DESCRIPTION
  * 	This module provides functions that manage the sending and receiving of LocoNet packets.
- * 	
+ *
  * 	As bytes are received from the LocoNet, they are stored in a circular
  * 	buffer and after a valid packet has been received it can be read out.
- * 	
+ *
  * 	When packets are sent successfully, they are also appended to the Receive
  * 	circular buffer so they can be handled like they had been received from
  * 	another device.
- * 
+ *
  * 	Statistics are maintained for both the send and receiving of packets.
- * 
+ *
  * 	Any invalid packets that are received are discarded and the stats are
  * 	updated approproately.
- * 
+ *
  *****************************************************************************/
 
 #include "LocoNet.h"
 
+#ifdef ESP32
+#include "Arduino.h"
+#include "EEPROM.h"
+#include "esp_system.h"
+#else
 #include <avr/eeprom.h>
 #include <avr/wdt.h>
+#endif
 
 const char * LoconetStatusStrings[] = {
 	"CD Backoff",
@@ -80,13 +86,17 @@ const char * LoconetStatusStrings[] = {
 
 LocoNetClass::LocoNetClass()
 {
+    pCv = 0;
+    pThrottle = 0;
+    pSv = 0;
+    pFastClock = 0;
 }
 
 const char* LocoNetClass::getStatusStr(LN_STATUS Status)
 {
   if((Status >= LN_CD_BACKOFF) && (Status <= LN_RETRY_ERROR))
     return LoconetStatusStrings[Status];
-	
+
   return "Invalid Status";
 }
 
@@ -179,13 +189,20 @@ uint8_t LocoNetClass::process()
 uint8_t LocoNetClass::process(uint8_t newByte)
 {
 	uint8_t isConsumed = 0;
-	
+
+
 	lnMsg * rxPacket = rxBuffer.addByte( newByte);
+
+
 	if(rxPacket)
 	{
-		if(notifyMessage)
+
+
+		if(notifyMessage != 0)
+		{
 			notifyMessage(rxPacket);
-			
+		}
+
 		isConsumed = processSwitchSensorMessage(rxPacket);
 		if( isConsumed )
 			return isConsumed;
@@ -215,8 +232,8 @@ uint8_t LocoNetClass::process(uint8_t newByte)
 				return isConsumed;
 		}
 	}
-	
-	return isConsumed;	
+
+	return isConsumed;
 }
 
 
@@ -459,13 +476,13 @@ void LocoNetThrottleClass::process100msActions(void)
 
 void LocoNetThrottleClass::init(LocoNetClass * lnInstance, uint8_t UserData, uint8_t Options, uint16_t ThrottleId )
 {
-		// Store our pointer to the LocoNet interface 
+		// Store our pointer to the LocoNet interface
 	this->lnInstance = lnInstance;
-	
-		// Add this instance into the list of all throttles 
+
+		// Add this instance into the list of all throttles
 	myNext = lnInstance->pThrottle;
 	lnInstance->pThrottle = this;
-	
+
   myState = TH_ST_FREE ;
   myThrottleId = ThrottleId ;
   myDeferredSpeed = 0 ;
@@ -920,9 +937,9 @@ void LocoNetFastClockClass::init(LocoNetClass * lnInstance, uint8_t DCS100Compat
 {
 	this->lnInstance = lnInstance;
 	lnInstance->pFastClock = this;
-	
+
   fcState = FC_ST_IDLE ;
-  
+
   fcFlags = 0;
   if(DCS100CompatibleSpeed)
 	fcFlags |= FC_FLAG_DCS100_COMPATIBLE_SPEED ;
@@ -955,8 +972,8 @@ void LocoNetFastClockClass::processMessage( lnMsg *LnPacket )
     {
       if( fcState >= FC_ST_REQ_TIME )
       {
-		    memcpy( &fcSlotData, &LnPacket->fc, sizeof( fastClockMsg ) ) ; 
-				
+		    memcpy( &fcSlotData, &LnPacket->fc, sizeof( fastClockMsg ) ) ;
+
         doNotify( 1 ) ;
 
 		if( fcFlags & FC_FLAG_NOTIFY_FRAC_MINS_TICK )
@@ -985,7 +1002,7 @@ void LocoNetFastClockClass::process66msActions(void)
       {
 					// For the next cycle prime the fraction of a minute accumulators
         fcSlotData.frac_minsl = FC_FRAC_RESET_LOW ;
-				
+
 					// If we are in FC_FLAG_DCS100_COMPATIBLE_SPEED mode we need to run faster
 					// by reducong the FRAC_MINS duration count by 128
         fcSlotData.frac_minsh = FC_FRAC_RESET_HIGH + (fcFlags & FC_FLAG_DCS100_COMPATIBLE_SPEED) ;
@@ -1003,7 +1020,7 @@ void LocoNetFastClockClass::process66msActions(void)
             fcSlotData.days++;
           }
         }
-				
+
 			// We either send a message out onto the LocoNet to change the time,
 			// which we will also see and act on or just notify our user
 			// function that our internal time has changed.
@@ -1031,10 +1048,10 @@ void LocoNetFastClockClass::process66msActions(void)
 void LocoNetSystemVariableClass::init(LocoNetClass *lnInstance, uint8_t mfgId, uint8_t devId, uint16_t productId, uint8_t swVersion)
 {
 	this->lnInstance = lnInstance;
-	 
+
 	DeferredProcessingRequired = 0;
   DeferredSrcAddr = 0;
-    
+
   this->mfgId = mfgId ;
 	this->devId = devId ;
 	this->productId = productId ;
@@ -1059,30 +1076,51 @@ uint8_t LocoNetSystemVariableClass::readSVStorage(uint16_t Offset )
 #endif
   if( Offset == SV_ADDR_SW_VERSION )
     return swVersion ;
-    
+
   else
   {
     Offset -= 2;    // Map SV Address to EEPROM Offset - Skip SV_ADDR_EEPROM_SIZE & SV_ADDR_SW_VERSION
+#ifdef ESP32
+    return  EEPROM.read((int)Offset);
+#else
     return eeprom_read_byte((uint8_t*)Offset);
+#endif
   }
 }
 
 uint8_t LocoNetSystemVariableClass::writeSVStorage(uint16_t Offset, uint8_t Value)
 {
   Offset -= 2;      // Map SV Address to EEPROM Offset - Skip SV_ADDR_EEPROM_SIZE & SV_ADDR_SW_VERSION
+#ifdef ESP32
+  if( EEPROM.read((int)Offset) != Value )
+#else
   if( eeprom_read_byte((uint8_t*)Offset) != Value )
+#endif
   {
+#ifdef ESP32
+     EEPROM.write((int)Offset, Value);
+#else
     eeprom_write_byte((uint8_t*)Offset, Value);
-    
+
+#endif
+
     if(notifySVChanged)
       notifySVChanged(Offset+2);
-  }    
-  return eeprom_read_byte((uint8_t*)Offset) ;
+  }
+#ifdef ESP32
+    return  EEPROM.read((int)Offset);
+#else
+    return eeprom_read_byte((uint8_t*)Offset);
+#endif
 }
 
 uint8_t LocoNetSystemVariableClass::isSVStorageValid(uint16_t Offset)
 {
-  return (Offset >= SV_ADDR_EEPROM_SIZE ) && (Offset <= E2END + 2) ; 
+#ifdef E2END
+  return (Offset >= SV_ADDR_EEPROM_SIZE ) && (Offset <= E2END + 2) ;
+#else
+  return (Offset >= SV_ADDR_EEPROM_SIZE ) && (Offset <= 0xFF + 2) ;
+#endif
 }
 
 bool LocoNetSystemVariableClass::CheckAddressRange(uint16_t startAddress, uint8_t Count)
@@ -1097,7 +1135,7 @@ bool LocoNetSystemVariableClass::CheckAddressRange(uint16_t startAddress, uint8_
     startAddress++;
     Count--;
   }
-  
+
   return 1; // all valid
 }
 
@@ -1105,7 +1143,7 @@ uint16_t LocoNetSystemVariableClass::writeSVNodeId(uint16_t newNodeId)
 {
     writeSVStorage(SV_ADDR_NODE_ID_H, newNodeId >> (byte) 8);
     writeSVStorage(SV_ADDR_NODE_ID_L, newNodeId & (byte) 0x00FF);
-    
+
     return readSVNodeId();
 }
 
@@ -1138,7 +1176,7 @@ void decodePeerData( peerXferMsg *pMsg, uint8_t *pOutData )
   uint8_t	Mask ;
   uint8_t	* pInData ;
   uint8_t	* pBits ;
-  
+
   Mask = 0x01 ;
   pInData = &pMsg->d1 ;
   pBits = &pMsg->pxct1 ;
@@ -1148,7 +1186,7 @@ void decodePeerData( peerXferMsg *pMsg, uint8_t *pOutData )
 	  pOutData[Index] = *pInData ;
     if( *pBits & Mask )
     	pOutData[Index] |= 0x80 ;
-      
+
     if( Index == 3 )
     {
 		  Mask = 0x01 ;
@@ -1169,7 +1207,7 @@ void encodePeerData( peerXferMsg *pMsg, uint8_t *pInData )
   uint8_t	Mask ;
   uint8_t	* pOutData ;
   uint8_t	* pBits ;
-  
+
   Mask = 0x01 ;
   pOutData = &pMsg->d1 ;
   pBits = &pMsg->pxct1 ;
@@ -1179,7 +1217,7 @@ void encodePeerData( peerXferMsg *pMsg, uint8_t *pInData )
     *pOutData = pInData[Index] & (uint8_t)0x7F;	// fixed SBor040102
     if( pInData[Index] & 0x80 )
     	*pBits |= Mask ;
-      
+
     if( Index == 3 )
     {
 		  Mask = 0x01 ;
@@ -1189,7 +1227,7 @@ void encodePeerData( peerXferMsg *pMsg, uint8_t *pInData )
 		else
     {
       Mask <<= (uint8_t) 1 ;
-			pOutData++;    
+			pOutData++;
     }
   }
 }
@@ -1198,7 +1236,7 @@ void encodePeerData( peerXferMsg *pMsg, uint8_t *pInData )
 SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
 {
  SV_Addr_t unData ;
-  
+
   if( ( LnPacket->sv.mesg_size != (byte) 0x10 ) ||
       ( LnPacket->sv.command != (byte) OPC_PEER_XFER ) ||
       ( LnPacket->sv.sv_type != (byte) 0x02 ) ||
@@ -1206,7 +1244,7 @@ SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
       ( ( LnPacket->sv.svx1 & (byte) 0xF0 ) != (byte) 0x10 ) ||
       ( ( LnPacket->sv.svx2 & (byte) 0xF0 ) != (byte) 0x10 ) )
     return SV_NOT_CONSUMED ;
- 
+
   decodePeerData( &LnPacket->px, unData.abPlain ) ;
 
 #ifdef DEBUG_SV
@@ -1217,8 +1255,8 @@ SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
     Serial.print("  CMD: ");
     Serial.println(LnPacket->sv.sv_cmd, HEX);
 #endif
-  if ((LnPacket->sv.sv_cmd != SV_DISCOVER) && 
-      (LnPacket->sv.sv_cmd != SV_CHANGE_ADDRESS) && 
+  if ((LnPacket->sv.sv_cmd != SV_DISCOVER) &&
+      (LnPacket->sv.sv_cmd != SV_CHANGE_ADDRESS) &&
       (unData.stDecoded.unDestinationId.w != readSVNodeId()))
   {
 #ifdef DEBUG_SV
@@ -1270,7 +1308,7 @@ SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
         DeferredProcessingRequired = 1 ;
         return SV_DEFERRED_PROCESSING_NEEDED ;
         break;
-    
+
     case SV_IDENTIFY:
         unData.stDecoded.unDestinationId.w            = readSVNodeId();
         unData.stDecoded.unMfgIdDevIdOrSvAddress.b.hi = devId;
@@ -1289,7 +1327,7 @@ SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
           return SV_NOT_CONSUMED; // not addressed
         if(readSVStorage(SV_ADDR_SERIAL_NUMBER_H) != unData.stDecoded.unSerialNumber.b.hi)
           return SV_NOT_CONSUMED; // not addressed
-          
+
         if (writeSVNodeId(unData.stDecoded.unDestinationId.w) != unData.stDecoded.unDestinationId.w)
         {
           lnInstance->send(OPC_LONG_ACK,(OPC_PEER_XFER & 0x7F),44);  // failed to change address in non-volatile memory (not implemented or failed to write)
@@ -1304,13 +1342,13 @@ SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
         lnInstance->send(OPC_LONG_ACK,(OPC_PEER_XFER & 0x7F),43); // not yet implemented
         return SV_ERROR;
   }
-    
+
   encodePeerData( &LnPacket->px, unData.abPlain ); // recycling the received packet
-    
+
   LnPacket->sv.sv_cmd |= 0x40;    // flag the message as reply
-  
+
   LN_STATUS lnStatus = lnInstance->send(LnPacket, LN_BACKOFF_INITIAL);
-	
+
 #ifdef DEBUG_SV
   Serial.print("LNSV Send Response - Status: ");
   Serial.println(lnStatus);   // report status value from send attempt
@@ -1320,13 +1358,17 @@ SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
     // failed to send the SV reply message.  Send will NOT be re-tried.
     lnInstance->send(OPC_LONG_ACK,(OPC_PEER_XFER & 0x7F),44);  // indicate failure to send the reply
   }
-    
+
   if (LnPacket->sv.sv_cmd == (SV_RECONFIGURE | 0x40))
   {
+#ifdef ESP32
+      esp_restart();  // reset the esp32
+#else
     wdt_enable(WDTO_15MS);  // prepare for reset
     while (1) {}            // stop and wait for watchdog to knock us out
+#endif
   }
-   
+
   return SV_CONSUMED_OK;
 }
 
@@ -1336,24 +1378,24 @@ SV_STATUS LocoNetSystemVariableClass::doDeferredProcessing( void )
   {
     lnMsg msg ;
     SV_Addr_t unData ;
-    
+
     msg.sv.command = (byte) OPC_PEER_XFER ;
     msg.sv.mesg_size = (byte) 0x10 ;
     msg.sv.src = DeferredSrcAddr ;
     msg.sv.sv_cmd = SV_DISCOVER | (byte) 0x40 ;
-    msg.sv.sv_type = (byte) 0x02 ; 
+    msg.sv.sv_type = (byte) 0x02 ;
     msg.sv.svx1 = (byte) 0x10 ;
     msg.sv.svx2 = (byte) 0x10 ;
-    
+
     unData.stDecoded.unDestinationId.w            = readSVNodeId();
     unData.stDecoded.unMfgIdDevIdOrSvAddress.b.lo = mfgId;
     unData.stDecoded.unMfgIdDevIdOrSvAddress.b.hi = devId;
     unData.stDecoded.unproductId.w                = productId;
     unData.stDecoded.unSerialNumber.b.lo          = readSVStorage(SV_ADDR_SERIAL_NUMBER_L);
     unData.stDecoded.unSerialNumber.b.hi          = readSVStorage(SV_ADDR_SERIAL_NUMBER_H);
-    
+
     encodePeerData( &msg.px, unData.abPlain );
-    
+
     if( lnInstance->send( &msg ) != LN_DONE )
       return SV_DEFERRED_PROCESSING_NEEDED ;
 
@@ -1366,7 +1408,7 @@ SV_STATUS LocoNetSystemVariableClass::doDeferredProcessing( void )
  /*****************************************************************************
  *	DESCRIPTION
  *	This module provides functions that manage the LNCV-specifiv programming protocol
- * 
+ *
  *****************************************************************************/
 
 // Adresses for the 'SRC' part of an UhlenbrockMsg
@@ -1492,7 +1534,7 @@ uint8_t LocoNetCVClass::processLNCVMessage(lnMsg * LnPacket) {
 						if (returnCode == LNCV_LACK_OK) {
 							// return the read value
 							makeLNCVresponse(response.ub, LnPacket->ub.SRC, LnPacket->ub.payload.data.deviceClass, LnPacket->ub.payload.data.lncvNumber, LnPacket->ub.payload.data.lncvValue, 0x00); // TODO: D7 was 0x80 here, but spec says that it is unused.
-							lnInstance->send(&response);	
+							lnInstance->send(&response);
 							ConsumedFlag = 1;
 						} else if (returnCode >= 0) {
 							uint8_t old_opcode(0x7F & LnPacket->ub.command);
@@ -1527,25 +1569,25 @@ uint8_t LocoNetCVClass::processLNCVMessage(lnMsg * LnPacket) {
 								#ifdef DEBUG_OUTPUT
 								printPacket((lnMsg*)&response);
 								#endif
-								LN_STATUS status = lnInstance->send((lnMsg*)&response);	
+								LN_STATUS status = lnInstance->send((lnMsg*)&response);
 								#ifdef DEBUG_OUTPUT
 								Serial.print(F("Return Code from Send: "));
 								Serial.print(status, HEX);
 								Serial.print("\n");
 								#else
-								status = status; // Avoid Compiler Warnings about unused variable 
+								status = status; // Avoid Compiler Warnings about unused variable
 								#endif
-								
+
 								ConsumedFlag = 1;
 							} // not for us? then no reaction!
 							#ifdef DEBUG_OUTPUT
 							else {DEBUG("Ignoring.\n");}
 							#endif
-						} 
+						}
 						#ifdef DEBUG_OUTPUT
 						else {DEBUG(" NOT EXECUTING!");}
 						#endif
-							
+
 					}
 					if ((LnPacket->ub.payload.data.flags & LNCV_FLAG_PROFF) != 0x00) {
 						// LNCV PROGRAMMING END
@@ -1576,7 +1618,7 @@ uint8_t LocoNetCVClass::processLNCVMessage(lnMsg * LnPacket) {
 	break;
 #ifdef DEBUG_OUTPUT
 	default:
-		Serial.println("Not a LNCV message."); 
+		Serial.println("Not a LNCV message.");
 #endif
 	}
 
