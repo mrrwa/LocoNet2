@@ -5,7 +5,7 @@
  *      Copyright (C) 2001 Ron W. Auld                                       *
  *      Copyright (C) 2004 Alex Shepherd                                                                      *
  *                                                                           *
- *      Portions Copyright (C) Digitrax Inc.                                 * 
+ *      Portions Copyright (C) Digitrax Inc.                                 *
  *                                                                           *
  *                                                                           *
  *  This library is free software; you can redistribute it and/or            *
@@ -160,6 +160,9 @@
 #define OPC_SE             0xE4 /* Opcode Security Element              */
 #define OPC_ANALOGIO       0xE5 /* Analog IO                            */
 
+#define LOWER_4K_ADDR_MASK  0x7F /* Address bits A6 to A0 */
+#define UPPER_4K_ADDR_MASK  0x0F /* Address bits A10 to A7 */
+#define UPPER_4K_ADDR_SHIFT 0x7
 
 /* Slot Status byte definitions and macros */
 /***********************************************************************************
