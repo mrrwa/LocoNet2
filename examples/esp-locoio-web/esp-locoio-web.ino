@@ -25,13 +25,13 @@ ESPAsyncWebServer:
  https://github.com/me-no-dev/ESPAsyncWebServer
 
 
-The following should be
+The following should be installed from the library manager
  SPIFFS
  ESPmDNS
- ArduinoJson
+ ArduinoJson - Use version 5.13.x not 6.x.Beta
 
 
- You will need the following plugins:
+You will need the following plugins:
 
 ESP32 Sketch Data Uploader:
 https://github.com/me-no-dev/arduino-esp32fs-plugin
@@ -112,7 +112,7 @@ You will then also need to update NUM_PINS as well.
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
 #include <ESPmDNS.h>
-#include <ArduinoJson.h>
+#include <ArduinoJson.h>         /* Use version 5.13.x not 6.xBeta  */
 
 #define ssid      "MySSID"       // Add your wifi SSID here
 #define password  "MyPassword "  // Add your wifi password here.
