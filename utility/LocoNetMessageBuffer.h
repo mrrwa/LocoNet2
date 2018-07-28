@@ -76,7 +76,7 @@ class LocoNetMessageBufferClass
   private:
 		uint8_t     		buffer[ LN_BUF_SIZE ] ;
   	uint8_t     		index ;
-  	 uint8_t     		checkSum ;
+  	uint8_t     		checkSum ;
   	uint8_t     		expLen ;
 
   public:

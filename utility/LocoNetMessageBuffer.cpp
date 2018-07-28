@@ -87,6 +87,10 @@ lnMsg *LocoNetMessageBufferClass::getMsg(void)
 			stats.rxPackets++;
 			return (lnMsg*)buffer;
 		}
+    else
+    {
+      stats.rxErrors++;
+    }
 	}
 
 	return NULL;
