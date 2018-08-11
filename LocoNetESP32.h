@@ -1,5 +1,5 @@
-#ifndef LOCONETUART_INCLUDED
-#define LOCONETUART_INCLUDED
+#ifndef LOCONETESP32_INCLUDED
+#define LOCONETESP32_INCLUDED
 
 /****************************************************************************
  * 	Copyright (C) 2015 Alex Shepherd
@@ -40,27 +40,53 @@
 #include "utility/LocoNet.h"
 
 #define RX_BUFFER_SIZE	64
+#define LN_ST_IDLE            0   // net is free for anyone to start transmission
+#define LN_ST_CD_BACKOFF      1   // timer interrupt is counting backoff bits
+#define LN_ST_TX_COLLISION    2   // just sending break after creating a collision
+#define LN_ST_TX              3   // transmitting a packet
+#define LN_ST_RX              4   // receiving bytes
+
+#define LN_COLLISION_TICKS 15
+#define LN_TX_RETRIES_MAX  25
 
 extern "C" void USART_TX_vect(void) __attribute__ ((signal));
 
-class LocoNetUartClass: public LocoNetClass
+class LocoNetESP32Class: public LocoNetClass
 {
-	private:
-		volatile uint8_t  lnState ;
-		volatile uint8_t  lnBitCount ;
-		volatile uint8_t  lnCurrentByte ;
-		volatile uint16_t lnCompareTarget ;
 
-		volatile uint8_t	rxHead;
-		volatile uint8_t	rxTail;
-		uint8_t						rxBuffer[RX_BUFFER_SIZE];
+    private:
 
-	public:
-		void init();
-		void process();
-		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
+        uint8_t txBuffer[ LN_BUF_SIZE];
 
-	
+        volatile uint16_t lnCompareTarget;
+        LnRxStats* rxStats;
+        volatile uint8_t txBytesRemaining;
+        static volatile uint8_t rxBufferBytes[ LN_BUF_SIZE];
+        volatile uint8_t rxHead = 0;
+        volatile uint8_t rxTail = 0;
+        volatile uint8_t* lnCurrentTxBytePtr;
+        volatile uint8_t errCount;
+
+        volatile lnMsg * volatile lnTxData;
+        volatile uint8_t lnTxIndex;
+        volatile uint8_t lnTxLength;
+
+    public:
+        void init();
+
+        LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
+        static void IRAM_ATTR loconetStartBit();
+        static void IRAM_ATTR loconetBitTimer();
+        static bool CheckCollision();
+        void TaskRun();
+
+        static void locoNetESP32Task(void* pvParams)
+        {
+            while(true)
+            {
+                ((LocoNetESP32Class*)pvParams)->TaskRun();
+            }
+        }
 
 };
 
