@@ -14,7 +14,7 @@
 #include <LocoNetESP32.h>
 #include <SSD1306.h>
 
-LocoNetESP32Class LocoNet;
+LocoNetESP32 LocoNet;
 SSD1306 display(0x3c, 5, 4);
 #define BUF_SIZE (1024)
 
@@ -31,12 +31,10 @@ void setup()
     LocoNet.init();
     LocoNet.onPacket(0xFF, [](lnMsg *rxPacket) {
         Serial.print("rx'd ");
-        for(uint8_t x = 0; x < 4; x++)
-        {
+        for(uint8_t x = 0; x < 4; x++) {
             uint8_t val = rxPacket->data[x];
             // Print a leading 0 if less than 16 to make 2 HEX digits
-            if(val < 16)
-            {
+            if(val < 16) {
                 Serial.print('0');
             }
 
@@ -45,7 +43,62 @@ void setup()
         }
         Serial.print("\r\n");
         return false;
-    })
+    });
+    LocoNet.onPacket(OPC_SW_REQ, [](lnMsg *lnPacket) {
+        uint16_t address = (lnPacket->srq.sw1 | ( ( lnPacket->srq.sw2 & 0x0F ) << 7 )) + 1;
+        bool output = lnPacket->srq.sw2 & OPC_SW_REQ_OUT;
+        bool direction = lnPacket->srq.sw2 & OPC_SW_REQ_DIR;
+        display.clear();
+        display.setTextAlignment(TEXT_ALIGN_LEFT);
+        display.drawString(0, 0, "Switch Request: ");
+        display.drawString(0, 20, String(address) + direction ? ":Closed" : ":Thrown");
+        display.drawString(0, 40, output ? "On" : "Off");
+        display.display();
+
+        Serial.print("Switch Request: ");
+        Serial.print(address, DEC);
+        Serial.print(':');
+        Serial.print(direction ? "Closed" : "Thrown");
+        Serial.print(" - ");
+        Serial.println(output ? "On" : "Off");
+        return true;
+    });
+    LocoNet.onPacket(OPC_SW_REP, [](lnMsg *lnPacket) {
+        uint16_t address = (lnPacket->srq.sw1 | ( ( lnPacket->srq.sw2 & 0x0F ) << 7 )) + 1;
+        bool state = lnPacket->srq.sw2 & OPC_SW_REP_HI;
+        bool sensor = lnPacket->srq.sw2 & OPC_SW_REP_SW;
+        display.clear();
+        display.setTextAlignment(TEXT_ALIGN_LEFT);
+        display.drawString(0, 0, "Switch Sensor Report: ");
+        display.drawString(0, 20, String(address) + sensor ? ":Switch" : ":Aux");
+        display.drawString(0, 40, state ? "Active" : "Inactive");
+        display.display();
+
+        Serial.print("Switch Sensor Report: ");
+        Serial.print(address, DEC);
+        Serial.print(':');
+        Serial.print(sensor ? "Switch" : "Aux");
+        Serial.print(" - ");
+        Serial.println(state ? "Active" : "Inactive");
+        return true;
+    });
+    LocoNet.onPacket(OPC_INPUT_REP, [](lnMsg *lnPacket) {
+        uint16_t address = (lnPacket->srq.sw1 | ( ( lnPacket->srq.sw2 & 0x0F ) << 7 ));
+        address <<= 1;
+        address += ( lnPacket->ir.in2 & OPC_INPUT_REP_SW ) ? 2 : 1 ;
+        bool state = lnPacket->ir.in2 & OPC_INPUT_REP_HI;
+        display.clear();
+        display.setTextAlignment(TEXT_ALIGN_LEFT);
+        display.drawString(0, 0, "Sensor: ");
+        display.drawString(0, 20, String(address));
+        display.drawString(0, 40, state ? "Active" : "Inactive");
+        display.display();
+        Serial.print("Sensor: ");
+        Serial.print(address, DEC);
+        Serial.print(" - ");
+        Serial.println(state ? "Active" : "Inactive");
+        return true;
+    });
 
     Serial.println("Display Initialising");
     // Then initialise the display interface */
@@ -55,115 +108,9 @@ void setup()
     display.setFont(ArialMT_Plain_10);
     display.drawString(0, 0, "Loconet Monitor");
     display.display();
-
 }
 
 void loop()
 {
-
     delay(1000);
-
-}
-
-// This call-back function is called from LocoNet.processSwitchSensorMessage
-// for all Sensor messages
-void notifySensor(uint16_t Address, uint8_t State)
-{
-    Serial.print("Sensor: ");
-    Serial.print(Address, DEC);
-    Serial.print(" - ");
-    Serial.println(State ? "Active" : "Inactive");
-}
-
-// This call-back function is called from LocoNet.processSwitchSensorMessage
-// for all Switch Request messages
-void notifySwitchRequest(uint16_t Address, uint8_t Output, uint8_t Direction)
-{
-    char tmp[24];
-    display.clear();
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    sprintf(tmp, "Switch Request: ");
-    display.drawString(0, 0, tmp);
-    sprintf(tmp, "%d:%s", Address, (Direction ? "Closed" : "Thrown"));
-    display.drawString(0, 20, tmp);
-    sprintf(tmp, "%s", (Output ? "On" : "Off"));
-    display.drawString(0, 40, tmp);
-    display.display();
-
-    Serial.print("Switch Request: ");
-    Serial.print(Address, DEC);
-    Serial.print(':');
-    Serial.print(Direction ? "Closed" : "Thrown");
-    Serial.print(" - ");
-    Serial.println(Output ? "On" : "Off");
-}
-
-// This call-back function is called from LocoNet.processSwitchSensorMessage
-// for all Switch Output Report messages
-void notifySwitchOutputsReport(uint16_t Address, uint8_t ClosedOutput, uint8_t ThrownOutput)
-{
-    char tmp[24];
-    display.clear();
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    sprintf(tmp, "Switch Output Repor: ");
-    display.drawString(0, 0, tmp);
-    sprintf(tmp, "%d:%s", Address, (ClosedOutput ? "On" : "Off"));
-    display.drawString(0, 20, tmp);
-    sprintf(tmp, "%s", (ThrownOutput ? "On" : "Off"));
-    display.drawString(0, 40, tmp);
-    display.display();
-
-    Serial.print("Switch Outputs Report: ");
-    Serial.print(Address, DEC);
-    Serial.print(": Closed - ");
-    Serial.print(ClosedOutput ? "On" : "Off");
-    Serial.print(": Thrown - ");
-    Serial.println(ThrownOutput ? "On" : "Off");
-}
-
-// This call-back function is called from LocoNet.processSwitchSensorMessage
-// for all Switch Sensor Report messages
-void notifySwitchReport(uint16_t Address, uint8_t State, uint8_t Sensor)
-{
-
-    char tmp[24];
-    display.clear();
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    sprintf(tmp, "Switch Sensor Report: ");
-    display.drawString(0, 0, tmp);
-    sprintf(tmp, "%d:%s", Address, (Sensor ? "Switch" : "Aux"));
-    display.drawString(0, 20, tmp);
-    sprintf(tmp, "%s", (State ? "Active" : "Inactive"));
-    display.drawString(0, 40, tmp);
-    display.display();
-
-    Serial.print("Switch Sensor Report: ");
-    Serial.print(Address, DEC);
-    Serial.print(':');
-    Serial.print(Sensor ? "Switch" : "Aux");
-    Serial.print(" - ");
-    Serial.println(State ? "Active" : "Inactive");
-}
-
-// This call-back function is called from LocoNet.processSwitchSensorMessage
-// for all Switch State messages
-void notifySwitchState(uint16_t Address, uint8_t Output, uint8_t Direction)
-{
-    char tmp[24];
-    display.clear();
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    sprintf(tmp, "Switch State: ");
-    display.drawString(0, 0, tmp);
-    sprintf(tmp, "%d:%s", Address, (Direction ? "Closed" : "Thrown"));
-    display.drawString(0, 20, tmp);
-    sprintf(tmp, "%s", (Output ? "On" : "Off"));
-    display.drawString(0, 40, tmp);
-    display.display();
-
-    Serial.print("Switch State: ");
-    Serial.print(Address, DEC);
-    Serial.print(':');
-    Serial.print(Direction ? "Closed" : "Thrown");
-    Serial.print(" - ");
-    Serial.println(Output ? "On" : "Off");
 }
