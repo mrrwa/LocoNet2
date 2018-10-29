@@ -34,16 +34,34 @@
  *
  *****************************************************************************/
 
-#include "LocoNetAvrICP.h"
+#pragma once
 
-void LocoNetAvrIcpClass::init(uint8_t txPin)
+#include "LocoNet.h"
+#ifndef ESP32
+
+#define RX_BUFFER_SIZE	64
+
+extern "C" void USART_TX_vect(void) __attribute__ ((signal));
+
+class LocoNetUart: public LocoNet
 {
-}
+	private:
+		volatile uint8_t  lnState ;
+		volatile uint8_t  lnBitCount ;
+		volatile uint8_t  lnCurrentByte ;
+		volatile uint16_t lnCompareTarget ;
 
-LN_STATUS LocoNetAvrIcpClass::sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay)
-{
-	txData = txData;						// Keep the Compilar happy
-	ucPrioDelay = ucPrioDelay;
+		volatile uint8_t	rxHead;
+		volatile uint8_t	rxTail;
+		uint8_t						rxBuffer[RX_BUFFER_SIZE];
 
-	return LN_DONE;
-}
+	public:
+		void init();
+		void process();
+		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
+
+	
+
+};
+
+#endif

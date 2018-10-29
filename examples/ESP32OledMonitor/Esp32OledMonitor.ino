@@ -10,17 +10,9 @@
 //
 // function and examples of each of the notifyXXXXXXX user call-back functions
 #include <stdio.h>
-#include "esp_log.h"
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/uart.h"
-
-#include "Arduino.h"
+#include <Arduino.h>
 #include <LocoNetESP32.h>
 #include <SSD1306.h>
-
-
 
 LocoNetESP32Class LocoNet;
 SSD1306 display(0x3c, 5, 4);
@@ -37,6 +29,23 @@ void setup()
     // First initialize the LocoNet interface
 
     LocoNet.init();
+    LocoNet.onPacket(0xFF, [](lnMsg *rxPacket) {
+        Serial.print("rx'd ");
+        for(uint8_t x = 0; x < 4; x++)
+        {
+            uint8_t val = rxPacket->data[x];
+            // Print a leading 0 if less than 16 to make 2 HEX digits
+            if(val < 16)
+            {
+                Serial.print('0');
+            }
+
+            Serial.print(val, HEX);
+            Serial.print(' ');
+        }
+        Serial.print("\r\n");
+        return false;
+    })
 
     Serial.println("Display Initialising");
     // Then initialise the display interface */
@@ -157,22 +166,4 @@ void notifySwitchState(uint16_t Address, uint8_t Output, uint8_t Direction)
     Serial.print(Direction ? "Closed" : "Thrown");
     Serial.print(" - ");
     Serial.println(Output ? "On" : "Off");
-}
-
-void notifyMessage(lnMsg *rxPacket)
-{
-    Serial.print("rx'd ");
-    for(uint8_t x = 0; x < 4; x++)
-    {
-        uint8_t val = rxPacket->data[x];
-        // Print a leading 0 if less than 16 to make 2 HEX digits
-        if(val < 16)
-        {
-            Serial.print('0');
-        }
-
-        Serial.print(val, HEX);
-        Serial.print(' ');
-    }
-    Serial.print("\r\n");
 }
