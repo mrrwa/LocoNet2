@@ -37,7 +37,7 @@
 #include "LocoNetAvrICP.h"
 #ifndef ESP32
 
-void LocoNetAvrIcpClass::init(uint8_t txPin)
+void LocoNetAvrIcpClass::begin(uint8_t txPin)
 {
 }
 
@@ -65,7 +65,7 @@ uint8_t LocoNetSystemVariable::readSVStorage(uint16_t Offset ) {
 								return 0xFF;
 #endif
   if( Offset == SV_ADDR_SW_VERSION ) {
-    return swVersion ;
+    return swVersion;
   } else {
     Offset -= 2;    // Map SV Address to EEPROM Offset - Skip SV_ADDR_EEPROM_SIZE & SV_ADDR_SW_VERSION
     return eeprom_read_byte((uint8_t*)Offset);
@@ -74,12 +74,18 @@ uint8_t LocoNetSystemVariable::readSVStorage(uint16_t Offset ) {
 
 uint8_t LocoNetSystemVariable::writeSVStorage(uint16_t Offset, uint8_t Value) {
   Offset -= 2;      // Map SV Address to EEPROM Offset - Skip SV_ADDR_EEPROM_SIZE & SV_ADDR_SW_VERSION
-  if( eeprom_read_byte((uint8_t*)Offset) != Value )
-  {
+  uint8_t oldValue = eeprom_read_byte((uint8_t*)Offset);
+  if(oldValue != Value) {
     eeprom_write_byte((uint8_t*)Offset, Value);
-    if(notifySVChanged)
-      notifySVChanged(Offset+2);
+    if(_svChangeCallback) {
+      _svChangeCallback(Offset+2, Value, oldValue);
+    }
   }
-    return eeprom_read_byte((uint8_t*)Offset);
+  return eeprom_read_byte((uint8_t*)Offset);
+}
+
+void LocoNetSystemVariable::reconfigure() {
+  wdt_enable(WDTO_15MS);  // prepare for reset
+  while (1) {}            // stop and wait for watchdog to knock us out
 }
 #endif

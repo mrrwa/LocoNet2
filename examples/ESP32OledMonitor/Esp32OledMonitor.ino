@@ -29,7 +29,7 @@ void setup()
     // First initialize the LocoNet interface
 
     LocoNet.init();
-    LocoNet.onPacket(0xFF, [](lnMsg *rxPacket) {
+    LocoNet.onPacket(CALLBACK_FOR_ALL_OPCODES, [](lnMsg *rxPacket) {
         Serial.print("rx'd ");
         for(uint8_t x = 0; x < 4; x++) {
             uint8_t val = rxPacket->data[x];
@@ -42,12 +42,8 @@ void setup()
             Serial.print(' ');
         }
         Serial.print("\r\n");
-        return false;
     });
-    LocoNet.onPacket(OPC_SW_REQ, [](lnMsg *lnPacket) {
-        uint16_t address = (lnPacket->srq.sw1 | ( ( lnPacket->srq.sw2 & 0x0F ) << 7 )) + 1;
-        bool output = lnPacket->srq.sw2 & OPC_SW_REQ_OUT;
-        bool direction = lnPacket->srq.sw2 & OPC_SW_REQ_DIR;
+    LocoNet.onSwitchRequest([](uint16_t address, bool output, bool direction) {
         display.clear();
         display.setTextAlignment(TEXT_ALIGN_LEFT);
         display.drawString(0, 0, "Switch Request: ");
@@ -61,12 +57,8 @@ void setup()
         Serial.print(direction ? "Closed" : "Thrown");
         Serial.print(" - ");
         Serial.println(output ? "On" : "Off");
-        return true;
     });
-    LocoNet.onPacket(OPC_SW_REP, [](lnMsg *lnPacket) {
-        uint16_t address = (lnPacket->srq.sw1 | ( ( lnPacket->srq.sw2 & 0x0F ) << 7 )) + 1;
-        bool state = lnPacket->srq.sw2 & OPC_SW_REP_HI;
-        bool sensor = lnPacket->srq.sw2 & OPC_SW_REP_SW;
+    LocoNet.onSwitchReport([](uint16_t address, bool state, bool sensor) {
         display.clear();
         display.setTextAlignment(TEXT_ALIGN_LEFT);
         display.drawString(0, 0, "Switch Sensor Report: ");
@@ -80,13 +72,8 @@ void setup()
         Serial.print(sensor ? "Switch" : "Aux");
         Serial.print(" - ");
         Serial.println(state ? "Active" : "Inactive");
-        return true;
     });
-    LocoNet.onPacket(OPC_INPUT_REP, [](lnMsg *lnPacket) {
-        uint16_t address = (lnPacket->srq.sw1 | ( ( lnPacket->srq.sw2 & 0x0F ) << 7 ));
-        address <<= 1;
-        address += ( lnPacket->ir.in2 & OPC_INPUT_REP_SW ) ? 2 : 1 ;
-        bool state = lnPacket->ir.in2 & OPC_INPUT_REP_HI;
+    LocoNet.onSensorChange([](uint16_t address, bool state) {
         display.clear();
         display.setTextAlignment(TEXT_ALIGN_LEFT);
         display.drawString(0, 0, "Sensor: ");
@@ -97,7 +84,6 @@ void setup()
         Serial.print(address, DEC);
         Serial.print(" - ");
         Serial.println(state ? "Active" : "Inactive");
-        return true;
     });
 
     Serial.println("Display Initialising");

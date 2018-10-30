@@ -65,36 +65,25 @@
 
 #include "LocoNet.h"
 
-void LocoNetSystemVariable::init(LocoNet *lnInstance, uint8_t mfgId, uint8_t devId, uint16_t productId, uint8_t swVersion) {
-	this->lnInstance = lnInstance;
-    lnInstance->onPacket(OPC_PEER_XFER, [this](lnMsg *rxPacket) {
-        if(this->processMessage(rxPacket) != SV_NOT_CONSUMED) {
-            return true;
-        }
-        return false;
-    });
-
-	DeferredProcessingRequired = 0;
-    DeferredSrcAddr = 0;
-
-    this->mfgId = mfgId ;
-	this->devId = devId ;
-	this->productId = productId ;
-    this->swVersion = swVersion ;
+LocoNetSystemVariable::LocoNetSystemVariable(LocoNet &locoNet, uint8_t mfgId, uint8_t devId, uint16_t productId, uint8_t swVersion) :
+  _locoNet(locoNet), _mfgId(mfgId), _devId(devId), _productId(productId), _swVersion(swVersion), _deferredProcessingRequired(false), _deferredSrcAddr(0) {
+  _locoNet.onPacket(OPC_PEER_XFER, [this](lnMsg *rxPacket) {
+    this->processMessage(rxPacket);
+  });
 }
 
 uint8_t LocoNetSystemVariable::isSVStorageValid(uint16_t Offset) {
 #ifdef E2END
-  return (Offset >= SV_ADDR_EEPROM_SIZE ) && (Offset <= E2END + 2) ;
+  return (Offset >= SV_ADDR_EEPROM_SIZE ) && (Offset <= E2END + 2);
 #else
-  return (Offset >= SV_ADDR_EEPROM_SIZE ) && (Offset <= 0xFF + 2) ;
+  return (Offset >= SV_ADDR_EEPROM_SIZE ) && (Offset <= 0xFF + 2);
 #endif
 }
 
 bool LocoNetSystemVariable::CheckAddressRange(uint16_t startAddress, uint8_t Count) {
   while (Count != 0) {
     if (!isSVStorageValid(startAddress)) {
-       lnInstance->send(OPC_LONG_ACK,(OPC_PEER_XFER & 0x7F), 42); // report invalid SV address error
+       _locoNet.send(OPC_LONG_ACK, (OPC_PEER_XFER & 0x7F), 42); // report invalid SV address error
        return false;
     }
     startAddress++;
@@ -105,18 +94,17 @@ bool LocoNetSystemVariable::CheckAddressRange(uint16_t startAddress, uint8_t Cou
 }
 
 uint16_t LocoNetSystemVariable::writeSVNodeId(uint16_t newNodeId) {
-    writeSVStorage(SV_ADDR_NODE_ID_H, newNodeId >> (uint8_t) 8);
-    writeSVStorage(SV_ADDR_NODE_ID_L, newNodeId & (uint8_t) 0x00FF);
-
-    return readSVNodeId();
+  writeSVStorage(SV_ADDR_NODE_ID_H, newNodeId >> 8);
+  writeSVStorage(SV_ADDR_NODE_ID_L, newNodeId & 0xFF);
+  return readSVNodeId();
 }
 
-uint16_t LocoNetSystemVariable::readSVNodeId(void) {
-    return (readSVStorage(SV_ADDR_NODE_ID_H) << 8 ) | readSVStorage(SV_ADDR_NODE_ID_L);
+uint16_t LocoNetSystemVariable::readSVNodeId() {
+  return (readSVStorage(SV_ADDR_NODE_ID_H) << 8) | readSVStorage(SV_ADDR_NODE_ID_L);
 }
 
 typedef union {
-  uint16_t                   w;
+  uint16_t                  w;
   struct { uint8_t lo,hi; } b;
 } U16_t;
 
@@ -130,71 +118,58 @@ typedef union {
   uint8_t abPlain[8];
 } SV_Addr_t;
 
-void decodePeerData( peerXferMsg *pMsg, uint8_t *pOutData ) {
-  uint8_t	Index ;
-  uint8_t	Mask ;
-  uint8_t	* pInData ;
-  uint8_t	* pBits ;
-
-  Mask = 0x01 ;
-  pInData = &pMsg->d1 ;
-  pBits = &pMsg->pxct1 ;
-
-  for( Index = 0; Index < 8; Index++) {
-	  pOutData[Index] = *pInData ;
-    if( *pBits & Mask )
-    	pOutData[Index] |= 0x80 ;
-
-    if( Index == 3 ) {
-		  Mask = 0x01 ;
-		  pInData = &pMsg->d5 ;
-		  pBits = &pMsg->pxct2 ;
+void decodePeerData(peerXferMsg *pMsg, uint8_t *pOutData) {
+  uint8_t bitMask = 0x01;
+  uint8_t * pInData = &pMsg->d1;
+  uint8_t * pBits = &pMsg->pxct1;
+  for(uint8_t index = 0; index < 8; index++) {
+    pOutData[index] = *pInData;
+    if(*pBits & bitMask) {
+    	pOutData[index] |= 0x80;
+    }
+    if(index == 3) {
+      bitMask = 0x01;
+      pInData = &pMsg->d5;
+      pBits = &pMsg->pxct2;
     } else {
-    	Mask <<= 1 ;
+      bitMask <<= 1;
       pInData++;
     }
   }
 }
 
-void encodePeerData( peerXferMsg *pMsg, uint8_t *pInData ){
-  uint8_t	Index ;
-  uint8_t	Mask ;
-  uint8_t	* pOutData ;
-  uint8_t	* pBits ;
-
-  Mask = 0x01 ;
-  pOutData = &pMsg->d1 ;
-  pBits = &pMsg->pxct1 ;
-
-  for( Index = 0; Index < 8; Index++) {
-    *pOutData = pInData[Index] & 0x7F;	// fixed SBor040102
-    if( pInData[Index] & 0x80 )
-    	*pBits |= Mask ;
-
-    if( Index == 3 ) {
-		  Mask = 0x01 ;
-		  pOutData = &pMsg->d5 ;
-		  pBits = &pMsg->pxct2 ;
+void encodePeerData(peerXferMsg *pMsg, uint8_t *pInData) {
+  uint8_t	bitMask = 0x01;
+  uint8_t	* pOutData = &pMsg->d1;
+  uint8_t	* pBits = &pMsg->pxct1;
+  for(uint8_t index = 0; index < 8; index++) {
+    *pOutData = pInData[index] & 0x7F;	// fixed SBor040102
+    if(pInData[index] & 0x80) {
+      *pBits |= bitMask;
+    }
+    if(index == 3) {
+      bitMask = 0x01;
+      pOutData = &pMsg->d5;
+      pBits = &pMsg->pxct2;
     } else {
-      Mask <<= 1 ;
-			pOutData++;
+      bitMask <<= 1;
+      pOutData++;
     }
   }
 }
 
-SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket ) {
- SV_Addr_t unData ;
+SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket) {
+  SV_Addr_t unData;
 
-  if( ( LnPacket->sv.mesg_size != 0x10 ) ||
-      ( LnPacket->sv.command != OPC_PEER_XFER ) ||
-      ( LnPacket->sv.sv_type != 0x02 ) ||
-      ( LnPacket->sv.sv_cmd & 0x40 ) ||
-      ( ( LnPacket->sv.svx1 & 0xF0 ) != 0x10 ) ||
-      ( ( LnPacket->sv.svx2 & 0xF0 ) != 0x10 ) )
-    return SV_NOT_CONSUMED ;
-
-  decodePeerData( &LnPacket->px, unData.abPlain ) ;
-
+  if((LnPacket->sv.mesg_size != 0x10) ||
+     (LnPacket->sv.command != OPC_PEER_XFER) ||
+     (LnPacket->sv.sv_type != 0x02) ||
+     (LnPacket->sv.sv_cmd & 0x40) ||
+     ((LnPacket->sv.svx1 & 0xF0) != 0x10) ||
+     ((LnPacket->sv.svx2 & 0xF0) != 0x10)) {
+    return SV_NOT_CONSUMED;
+  }
+  decodePeerData(&LnPacket->px, unData.abPlain);
 #ifdef DEBUG_SV
     Serial.print("LNSV Src: ");
     Serial.print(LnPacket->sv.src);
@@ -213,7 +188,7 @@ SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket ) {
     return SV_NOT_CONSUMED;
   }
 
-  switch( LnPacket->sv.sv_cmd ) {
+  switch(LnPacket->sv.sv_cmd) {
     case SV_WRITE_SINGLE:
         if (!CheckAddressRange(unData.stDecoded.unMfgIdDevIdOrSvAddress.w, 1)) return SV_ERROR;
         writeSVStorage(unData.stDecoded.unMfgIdDevIdOrSvAddress.w, unData.abPlain[4]);
@@ -222,7 +197,6 @@ SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket ) {
         if (!CheckAddressRange(unData.stDecoded.unMfgIdDevIdOrSvAddress.w, 1)) return SV_ERROR;
         unData.abPlain[4] = readSVStorage(unData.stDecoded.unMfgIdDevIdOrSvAddress.w);
         break;
-
     case SV_WRITE_MASKED:
         if (!CheckAddressRange(unData.stDecoded.unMfgIdDevIdOrSvAddress.w, 1)) return SV_ERROR;
         // new scope for temporary local variables only
@@ -233,7 +207,6 @@ SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket ) {
         }
         unData.abPlain[4] = readSVStorage(unData.stDecoded.unMfgIdDevIdOrSvAddress.w);
         break;
-
     case SV_WRITE_QUAD:
         if (!CheckAddressRange(unData.stDecoded.unMfgIdDevIdOrSvAddress.w, 4)) return SV_ERROR;
         writeSVStorage(unData.stDecoded.unMfgIdDevIdOrSvAddress.w+0, unData.abPlain[4]);
@@ -248,53 +221,45 @@ SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket ) {
         unData.abPlain[6] = readSVStorage(unData.stDecoded.unMfgIdDevIdOrSvAddress.w+2);
         unData.abPlain[7] = readSVStorage(unData.stDecoded.unMfgIdDevIdOrSvAddress.w+3);
         break;
-
     case SV_DISCOVER:
-        DeferredSrcAddr = LnPacket->sv.src ;
-        DeferredProcessingRequired = 1 ;
-        return SV_DEFERRED_PROCESSING_NEEDED ;
+        _deferredSrcAddr = LnPacket->sv.src;
+        _deferredProcessingRequired = 1;
+        return SV_DEFERRED_PROCESSING_NEEDED;
         break;
-
     case SV_IDENTIFY:
         unData.stDecoded.unDestinationId.w            = readSVNodeId();
-        unData.stDecoded.unMfgIdDevIdOrSvAddress.b.hi = devId;
-        unData.stDecoded.unMfgIdDevIdOrSvAddress.b.lo = mfgId ;
-        unData.stDecoded.unproductId.w                = productId;
+        unData.stDecoded.unMfgIdDevIdOrSvAddress.b.hi = _devId;
+        unData.stDecoded.unMfgIdDevIdOrSvAddress.b.lo = _mfgId;
+        unData.stDecoded.unproductId.w                = _productId;
         unData.stDecoded.unSerialNumber.b.lo          = readSVStorage(SV_ADDR_SERIAL_NUMBER_L);
         unData.stDecoded.unSerialNumber.b.hi          = readSVStorage(SV_ADDR_SERIAL_NUMBER_H);
         break;
-
     case SV_CHANGE_ADDRESS:
-        if((mfgId != unData.stDecoded.unMfgIdDevIdOrSvAddress.b.lo) || (devId != unData.stDecoded.unMfgIdDevIdOrSvAddress.b.hi))
+        if((_mfgId != unData.stDecoded.unMfgIdDevIdOrSvAddress.b.lo) || (_devId != unData.stDecoded.unMfgIdDevIdOrSvAddress.b.hi))
           return SV_NOT_CONSUMED; // not addressed
-        if(productId != unData.stDecoded.unproductId.w)
+        if(_productId != unData.stDecoded.unproductId.w)
           return SV_NOT_CONSUMED; // not addressed
         if(readSVStorage(SV_ADDR_SERIAL_NUMBER_L) != unData.stDecoded.unSerialNumber.b.lo)
           return SV_NOT_CONSUMED; // not addressed
         if(readSVStorage(SV_ADDR_SERIAL_NUMBER_H) != unData.stDecoded.unSerialNumber.b.hi)
           return SV_NOT_CONSUMED; // not addressed
 
-        if (writeSVNodeId(unData.stDecoded.unDestinationId.w) != unData.stDecoded.unDestinationId.w)
-        {
-          lnInstance->send(OPC_LONG_ACK,(OPC_PEER_XFER & 0x7F),44);  // failed to change address in non-volatile memory (not implemented or failed to write)
-          return SV_CONSUMED_OK ; // the LN reception was ok, we processed the message
+        if (writeSVNodeId(unData.stDecoded.unDestinationId.w) != unData.stDecoded.unDestinationId.w) {
+          // failed to change address in non-volatile memory (not implemented or failed to write)
+          _locoNet.send(OPC_LONG_ACK,(OPC_PEER_XFER & 0x7F), 44);
+          return SV_CONSUMED_OK; // the LN reception was ok, we processed the message
         }
         break;
-
     case SV_RECONFIGURE:
         break;  // actual handling is done after sending out the reply
-
     default:
-        lnInstance->send(OPC_LONG_ACK,(OPC_PEER_XFER & 0x7F),43); // not yet implemented
+        _locoNet.send(OPC_LONG_ACK,(OPC_PEER_XFER & 0x7F),43); // not yet implemented
         return SV_ERROR;
   }
 
-  encodePeerData( &LnPacket->px, unData.abPlain ); // recycling the received packet
-
+  encodePeerData(&LnPacket->px, unData.abPlain); // recycling the received packet
   LnPacket->sv.sv_cmd |= 0x40;    // flag the message as reply
-
-  LN_STATUS lnStatus = lnInstance->send(LnPacket, LN_BACKOFF_INITIAL);
-
+  LN_STATUS lnStatus = _locoNet.send(LnPacket, LN_BACKOFF_INITIAL);
 #ifdef DEBUG_SV
   Serial.print("LNSV Send Response - Status: ");
   Serial.println(lnStatus);   // report status value from send attempt
@@ -302,49 +267,42 @@ SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket ) {
 
   if (lnStatus != LN_DONE) {
     // failed to send the SV reply message.  Send will NOT be re-tried.
-    lnInstance->send(OPC_LONG_ACK,(OPC_PEER_XFER & 0x7F),44);  // indicate failure to send the reply
+    _locoNet.send(OPC_LONG_ACK, (OPC_PEER_XFER & 0x7F), 44);  // indicate failure to send the reply
   }
 
   if (LnPacket->sv.sv_cmd == (SV_RECONFIGURE | 0x40)) {
-#ifdef ESP32
-    //esp_restart();  // reset the esp32
-#else
-    wdt_enable(WDTO_15MS);  // prepare for reset
-    while (1) {}            // stop and wait for watchdog to knock us out
-#endif
+    reconfigure();
   }
 
   return SV_CONSUMED_OK;
 }
 
-SV_STATUS LocoNetSystemVariable::doDeferredProcessing( void ) {
-  if( DeferredProcessingRequired )
-  {
-    lnMsg msg ;
-    SV_Addr_t unData ;
+SV_STATUS LocoNetSystemVariable::doDeferredProcessing() {
+  if(_deferredProcessingRequired) {
+    lnMsg msg;
+    SV_Addr_t unData;
 
-    msg.sv.command = OPC_PEER_XFER ;
-    msg.sv.mesg_size = 0x10 ;
-    msg.sv.src = DeferredSrcAddr ;
-    msg.sv.sv_cmd = SV_DISCOVER | 0x40 ;
-    msg.sv.sv_type = 0x02 ;
-    msg.sv.svx1 = 0x10 ;
-    msg.sv.svx2 = 0x10 ;
+    msg.sv.command = OPC_PEER_XFER;
+    msg.sv.mesg_size = 0x10;
+    msg.sv.src = _deferredSrcAddr;
+    msg.sv.sv_cmd = SV_DISCOVER | 0x40;
+    msg.sv.sv_type = 0x02;
+    msg.sv.svx1 = 0x10;
+    msg.sv.svx2 = 0x10;
 
     unData.stDecoded.unDestinationId.w            = readSVNodeId();
-    unData.stDecoded.unMfgIdDevIdOrSvAddress.b.lo = mfgId;
-    unData.stDecoded.unMfgIdDevIdOrSvAddress.b.hi = devId;
-    unData.stDecoded.unproductId.w                = productId;
+    unData.stDecoded.unMfgIdDevIdOrSvAddress.b.lo = _mfgId;
+    unData.stDecoded.unMfgIdDevIdOrSvAddress.b.hi = _devId;
+    unData.stDecoded.unproductId.w                = _productId;
     unData.stDecoded.unSerialNumber.b.lo          = readSVStorage(SV_ADDR_SERIAL_NUMBER_L);
     unData.stDecoded.unSerialNumber.b.hi          = readSVStorage(SV_ADDR_SERIAL_NUMBER_H);
 
-    encodePeerData( &msg.px, unData.abPlain );
+    encodePeerData(&msg.px, unData.abPlain);
 
-    if( lnInstance->send( &msg ) != LN_DONE )
-      return SV_DEFERRED_PROCESSING_NEEDED ;
-
-    DeferredProcessingRequired = 0 ;
+    if(_locoNet.send(&msg) != LN_DONE) {
+      return SV_DEFERRED_PROCESSING_NEEDED;
+    }
+    _deferredProcessingRequired = false;
   }
-
-  return SV_CONSUMED_OK ;
+  return SV_CONSUMED_OK;
 }

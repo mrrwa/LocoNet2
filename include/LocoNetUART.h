@@ -43,8 +43,7 @@
 
 extern "C" void USART_TX_vect(void) __attribute__ ((signal));
 
-class LocoNetUart: public LocoNet
-{
+class LocoNetUart: public LocoNet {
 	private:
 		volatile uint8_t  lnState ;
 		volatile uint8_t  lnBitCount ;
@@ -54,14 +53,10 @@ class LocoNetUart: public LocoNet
 		volatile uint8_t	rxHead;
 		volatile uint8_t	rxTail;
 		uint8_t						rxBuffer[RX_BUFFER_SIZE];
-
-	public:
-		void init();
-		void process();
+	protected:
 		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
-
-	
-
+	public:
+		virtual void begin();
 };
 
 #endif

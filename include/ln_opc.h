@@ -224,26 +224,26 @@
 #define CONSISTED(s) (((s & CONSIST_MASK) == CONSIST_MID) || ((s & CONSIST_MASK) == CONSIST_SUB))
 
 /* mask and values for locomotive use determination */
-#define LOCOSTAT_MASK     (STAT1_SL_BUSY  | STAT1_SL_ACTIVE)
-#define LOCO_IN_USE       (STAT1_SL_BUSY  | STAT1_SL_ACTIVE)
-#define LOCO_IDLE         (STAT1_SL_BUSY)
-#define LOCO_COMMON       (STAT1_SL_ACTIVE)
-#define LOCO_FREE         (0)
-#define LOCO_STAT(s)    (  ((s & LOCOSTAT_MASK) == LOCO_IN_USE) ? "In-Use" : \
+constexpr uint8_t LOCOSTAT_MASK = STAT1_SL_BUSY + STAT1_SL_ACTIVE;
+constexpr uint8_t LOCO_IN_USE   = STAT1_SL_BUSY + STAT1_SL_ACTIVE;
+constexpr uint8_t LOCO_IDLE     = STAT1_SL_BUSY;
+constexpr uint8_t LOCO_COMMON   = STAT1_SL_ACTIVE;
+constexpr uint8_t LOCO_FREE     = 0;
+#define LOCO_STAT(s)    (  ((s & LOCOSTAT_MASK)) ? "In-Use" : \
                          ( ((s & LOCOSTAT_MASK) == LOCO_IDLE)   ? "Idle" : \
                           (((s & LOCOSTAT_MASK) == LOCO_COMMON) ? "Common" : \
                            "Free")))
 
 /* mask and values for decoder type encoding for this slot */
-#define DEC_MODE_MASK     (STAT1_SL_SPDEX | STAT1_SL_SPD14 | STAT1_SL_SPD28)
+constexpr uint8_t DEC_MODE_MASK = STAT1_SL_SPDEX + STAT1_SL_SPD14 + STAT1_SL_SPD28;
 /* Advanced consisting allowed for the next two */
-#define DEC_MODE_128A     (STAT1_SL_SPDEX | STAT1_SL_SPD14 | STAT1_SL_SPD28)
-#define DEC_MODE_28A      (STAT1_SL_SPDEX                                  )
+constexpr uint8_t DEC_MODE_128A = STAT1_SL_SPDEX + STAT1_SL_SPD14 + STAT1_SL_SPD28;
+constexpr uint8_t DEC_MODE_28A  = STAT1_SL_SPDEX;
 /* normal modes */
-#define DEC_MODE_128      (STAT1_SL_SPD14 | STAT1_SL_SPD28)
-#define DEC_MODE_14       (STAT1_SL_SPD14)
-#define DEC_MODE_28TRI    (STAT1_SL_SPD28)
-#define DEC_MODE_28       (0)
+constexpr uint8_t DEC_MODE_128   = STAT1_SL_SPD14 + STAT1_SL_SPD28;
+constexpr uint8_t DEC_MODE_14    = STAT1_SL_SPD14;
+constexpr uint8_t DEC_MODE_28TRI = STAT1_SL_SPD28;
+constexpr uint8_t DEC_MODE_28    = 0;
 #define DEC_MODE(s)    (    ((s & DEC_MODE_MASK) == DEC_MODE_128A)  ? "128 (Allow Adv. consisting)" : \
                         (   ((s & DEC_MODE_MASK) == DEC_MODE_28A)   ? "28 (Allow Adv. consisting)" : \
                          (  ((s & DEC_MODE_MASK) == DEC_MODE_128)   ? "128" : \

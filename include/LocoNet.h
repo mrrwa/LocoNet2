@@ -108,12 +108,13 @@ constexpr uint8_t LN_BACKOFF_MAX        = (LN_BACKOFF_INITIAL + 10);            
 
 #define LN_TX_RETRIES_MAX  25
 
-
-typedef std::function<bool(lnMsg *)> OpCodeCallbackFunction;
+constexpr uint8_t CALLBACK_FOR_ALL_OPCODES=0xFF;
 
 class LocoNet {
     public:
         LocoNet();
+        virtual void begin();
+        virtual void end();
         LN_STATUS send(lnMsg *TxPacket);
         LN_STATUS send(lnMsg *TxPacket, uint8_t PrioDelay);
         LN_STATUS send(uint8_t OpCode, uint8_t Data1, uint8_t Data2);
@@ -124,24 +125,51 @@ class LocoNet {
 
         const char* getStatusStr(LN_STATUS Status);
 
-        bool process();
-        bool process(uint8_t newByte);
-
         LN_STATUS requestSwitch(uint16_t Address, uint8_t Output, uint8_t Direction);
         LN_STATUS reportSwitch(uint16_t Address);
         LN_STATUS reportSensor(uint16_t Address, uint8_t State);
-        LN_STATUS reportPower(uint8_t State);
+        LN_STATUS reportPower(bool state);
 
-        void onPacket(uint8_t OpCode, OpCodeCallbackFunction callback);
+        void onPacket(uint8_t OpCode, std::function<void(lnMsg *)> callback);
+        /**
+         * Registers a callback for when a sensor changes state
+         *                                     address   state
+         */
+        void onSensorChange(std::function<void(uint16_t, bool)> callback);
+        /**
+         * Registers a callback for when a switch is requested
+         *                                     address   output direction
+         */
+        void onSwitchRequest(std::function<void(uint16_t, bool, bool)> callback);
+        /**
+         * Registers a callback for when a switch/sensor status is reported
+         *                                     address   state switch/sensor
+         */
+        void onSwitchReport(std::function<void(uint16_t, bool, bool)> callback);
+        /**
+         * Registers a callback for when a switch is requested
+         *                                     address   output direction
+         */
+        void onSwitchState(std::function<void(uint16_t, bool, bool)> callback);
+
+        /**
+         * Registers a callback for when power status changes
+         *                                    on/off
+         */
+        void onPowerChange(std::function<void(bool)> callback);
     protected:
+        void consume(uint8_t newByte);
+
         virtual LN_STATUS sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay) = 0;
         LocoNetMessageBuffer rxBuffer;
         LnTxStats txStats;
 
     private:
         bool processSwitchSensorMessage(lnMsg *LnPacket);
-        std::map<uint8_t, std::vector< OpCodeCallbackFunction > > callbacks;
+        std::map<uint8_t, std::vector<std::function<void(lnMsg *)>>> callbacks;
 };
+
+#define TH_OP_DEFERRED_SPEED 0x01
 
 typedef enum {
     TH_ST_FREE = 0,
@@ -154,41 +182,59 @@ typedef enum {
     TH_ST_IN_USE
 } TH_STATE;
 
-typedef enum{
+typedef enum {
     TH_ER_OK = 0, TH_ER_SLOT_IN_USE, TH_ER_BUSY, TH_ER_NOT_SELECTED, TH_ER_NO_LOCO, TH_ER_NO_SLOTS
 } TH_ERROR;
 
-#define TH_OP_DEFERRED_SPEED 0x01
-
 class LocoNetThrottle {
-    private:
-        TH_STATE myState;         // State of throttle
-        uint16_t myTicksSinceLastAction;
-        uint16_t myThrottleId;		// Id of throttle
-        uint8_t mySlot;          // Master Slot index
-        uint16_t myAddress;       // Decoder Address
-        uint8_t mySpeed;         // Loco Speed
-        uint8_t myDeferredSpeed; // Deferred Loco Speed setting
-        uint8_t myStatus1;       // Stat1
-        uint8_t myDirFunc0to4;   // Direction
-        uint8_t myFunc5to8;       // Direction
-        uint8_t myUserData;
-        uint8_t myOptions;
-        uint32_t myLastTimerMillis;
-        LocoNet *lnInstance;
-
-        void updateAddress(uint16_t Address, uint8_t ForceNotify);
-        void updateSpeed(uint8_t Speed, uint8_t ForceNotify);
-        void updateState(TH_STATE State, uint8_t ForceNotify);
-        void updateStatus1(uint8_t Status, uint8_t ForceNotify);
-        void updateDirectionAndFunctions(uint8_t DirFunc0to4, uint8_t ForceNotify);
-        void updateFunctions5to8(uint8_t Func5to8, uint8_t ForceNotify);
-
     public:
-        void init(LocoNet* lnInstance, uint8_t UserData, uint8_t Options, uint16_t ThrottleId);
-
+        LocoNetThrottle(LocoNet &locoNet, uint8_t userData, uint8_t options, uint16_t throttleId);
         bool processMessage(lnMsg *LnPacket);
         void process100msActions(void);
+
+        /**
+         * Registers a callback for when the address for this throttle changes
+         */
+        void onAddressChange(std::function<void(LocoNetThrottle *, uint16_t)> callback) {
+            addressChangeCallback = callback;
+        }
+        /**
+         * Registers a callback for when the speed for this throttle changes
+         */
+        void onSpeedChange(std::function<void(LocoNetThrottle *, uint8_t)> callback) {
+            speedChangeCallback = callback;
+        }
+        /**
+         * Registers a callback for when the direction for this throttle changes
+         */
+        void onDirectionChange(std::function<void(LocoNetThrottle *, uint8_t)> callback) {
+            directionChangeCallback = callback;
+        }
+        /**
+         * Registers a callback for when a function for this throttle changes
+         */
+        void onFunctionChange(std::function<void(LocoNetThrottle *, uint8_t, bool)> callback) {
+            functionChangeCallback = callback;
+        }
+        /**
+         * Registers a callback for when this throttle changes slots
+         */
+        void onSlotStateChange(std::function<void(LocoNetThrottle *, uint8_t)> callback) {
+            throttleSlotStateCallback = callback;
+        }
+        /**
+         * Registers a callback for when a this throttle has an error
+         */
+        void onError(std::function<void(LocoNetThrottle *, TH_ERROR)> callback) {
+            throttleErrorCallback = callback;
+        }
+        /**
+         * Registers a callback for when this throttle changes status
+         *                                                             Old Status  New Status
+         */
+        void onThrottleStateChange(std::function<void(LocoNetThrottle *, TH_STATE, TH_STATE)> callback) {
+            throttleStateCallback = callback;
+        }
 
         uint16_t getAddress(void);
         TH_ERROR setAddress(uint16_t Address);
@@ -212,6 +258,34 @@ class LocoNetThrottle {
         TH_STATE getState(void);
         const char *getStateStr(TH_STATE State);
         const char *getErrorStr(TH_ERROR Error);
+    private:
+        LocoNet &_locoNet;
+        TH_STATE _state;                // State of throttle
+        uint16_t _ticksSinceLastAction;
+        uint16_t _throttleId;           // Id of throttle
+        uint8_t _slot;                  // Master Slot index
+        uint16_t _address;              // Decoder Address
+        uint8_t _speed;                 // Loco Speed
+        uint8_t _deferredSpeed;         // Deferred Loco Speed setting
+        uint8_t _status1;               // Stat1
+        uint8_t _dirFunc0to4;           // Direction
+        uint8_t _func5to8;              // Direction
+        uint8_t _userData;
+        uint8_t _options;
+
+        void updateAddress(uint16_t Address, uint8_t ForceNotify);
+        void updateSpeed(uint8_t Speed, uint8_t ForceNotify);
+        void updateState(TH_STATE State, uint8_t ForceNotify);
+        void updateStatus1(uint8_t Status, uint8_t ForceNotify);
+        void updateDirectionAndFunctions(uint8_t DirFunc0to4, uint8_t ForceNotify);
+        void updateFunctions5to8(uint8_t Func5to8, uint8_t ForceNotify);
+        std::function<void(LocoNetThrottle *, uint16_t)> addressChangeCallback;
+        std::function<void(LocoNetThrottle *, uint8_t)> speedChangeCallback;
+        std::function<void(LocoNetThrottle *, uint8_t, bool)> functionChangeCallback;
+        std::function<void(LocoNetThrottle *, uint8_t)> directionChangeCallback;
+        std::function<void(LocoNetThrottle *, uint8_t)> throttleSlotStateCallback;
+        std::function<void(LocoNetThrottle *, TH_STATE, TH_STATE)> throttleStateCallback;
+        std::function<void(LocoNetThrottle *, TH_ERROR)> throttleErrorCallback;
 };
 
 /************************************************************************************
@@ -266,20 +340,34 @@ typedef enum {
 } FC_STATE;
 
 class LocoNetFastClock {
-    private:
-        FC_STATE fcState;			// State of the Fast Clock Slave
-        uint8_t fcFlags;			// Storage of the option flags passed into initFastClock()
-        fastClockMsg fcSlotData;		// Primary storage for the Fast Clock slot data
-        uint8_t fcLastPeriod;		// Period of last tick so we can alternate between
-        LocoNet *lnInstance;
-        void doNotify(uint8_t Sync);
-
     public:
-        void init(LocoNet * lnInstance, uint8_t DCS100CompatibleSpeed, uint8_t CorrectDCS100Clock,
-                uint8_t NotifyFracMin);
+        LocoNetFastClock(LocoNet & locoNet, bool DCS100CompatibleSpeed, bool CorrectDCS100Clock);
         void poll(void);
-        bool processMessage(lnMsg *LnPacket);
         void process66msActions(void);
+        /**
+         * Registers a callback for when the fast clock updates
+         *                               Rate       Day      Hour   Minute   Sync
+         */
+        void onUpdate(std::function<void(uint8_t, uint8_t, uint8_t, uint8_t, bool)> callback) {
+            _updateCallback = callback;
+        }
+
+        /**
+         * Registers a callback for the fractional minute updates
+         */
+        void onFractionalMinUpdate(std::function<void(uint16_t)> callback) {
+            _fractionalMinCallback = callback;
+        }
+    private:
+        LocoNet &_locoNet;
+        bool _DCS100CompatibleSpeed;
+        bool _CorrectDCS100Clock;
+        FC_STATE _state;
+        lnMsg _data;
+
+        void processMessage(lnMsg *LnPacket);
+        std::function<void(uint8_t, uint8_t, uint8_t, uint8_t, bool)> _updateCallback;
+        std::function<void(uint16_t)> _fractionalMinCallback;
 };
 
 /************************************************************************************
@@ -319,16 +407,59 @@ typedef enum {
 #define SV_MANUFACTURER_DIY		13
 
 class LocoNetSystemVariable {
-    protected:
-        uint8_t mfgId;
-        uint8_t devId;
-        uint16_t productId;
-        uint8_t swVersion;
+    public:
+        LocoNetSystemVariable(LocoNet &locoNet, uint8_t newMfgId, uint8_t newDevId, uint16_t newProductId,
+                uint8_t newSwVersion);
 
-        LocoNet *lnInstance;
+        /**
+         * Check whether a message is an SV programming message. If so, the message
+         * is processed.
+         * Call this message in your main loop to implement SV programming.
+         *
+         * TODO: This method should be updated to reflect whether the message has
+         *	been consumed.
+         *
+         * Note that this method will not send out replies.
+         *
+         * Returns:
+         *		SV_OK - the message was or was not an SV programming message.
+         It may or may not have been consumed.
+         *		SV_DEFERRED_PROCESSING_NEEDED - the message was an SV programming
+         message and has been consumed. doDeferredProcessing() must be
+         called to actually process the message.
+         *		SV_ERROR - the message was an SV programming message and carried
+         an unsupported OPCODE.
+         *
+         */
+        SV_STATUS processMessage(lnMsg *LnPacket);
 
-        uint8_t DeferredProcessingRequired;
-        uint8_t DeferredSrcAddr;
+        /**
+         * Attempts to send a reply to an SV programming message.
+         * This method will repeatedly try to send the message, until it succeeds.
+         *
+         * Returns:
+         *		SV_OK - Reply was successfully sent.
+         *		SV_DEFERRED_PROCESSING_NEEDED - Reply was not sent, a later retry is needed.
+         */
+        SV_STATUS doDeferredProcessing(void);
+
+        /**
+         * Register SV Change callback
+         *                                  SV       value    old value
+         */
+        void onSVChange(std::function<void(uint16_t, uint8_t, uint8_t)> callback) {
+            _svChangeCallback = callback;
+        }
+    private:
+        LocoNet &_locoNet;
+        uint8_t _mfgId;
+        uint8_t _devId;
+        uint16_t _productId;
+        uint8_t _swVersion;
+        bool _deferredProcessingRequired;
+        uint8_t _deferredSrcAddr;
+        std::function<void(uint16_t, uint8_t, uint8_t)> _svChangeCallback;
+
 
         /** Read a value from the given EEPROM offset.
          *
@@ -390,101 +521,92 @@ class LocoNetSystemVariable {
          */
         bool CheckAddressRange(uint16_t startAddress, uint8_t Count);
 
-    public:
-        void init(LocoNet *lnInstance, uint8_t newMfgId, uint8_t newDevId, uint16_t newProductId,
-                uint8_t newSwVersion);
-
-        /**
-         * Check whether a message is an SV programming message. If so, the message
-         * is processed.
-         * Call this message in your main loop to implement SV programming.
-         *
-         * TODO: This method should be updated to reflect whether the message has
-         *	been consumed.
-         *
-         * Note that this method will not send out replies.
-         *
-         * Returns:
-         *		SV_OK - the message was or was not an SV programming message.
-         It may or may not have been consumed.
-         *		SV_DEFERRED_PROCESSING_NEEDED - the message was an SV programming
-         message and has been consumed. doDeferredProcessing() must be
-         called to actually process the message.
-         *		SV_ERROR - the message was an SV programming message and carried
-         an unsupported OPCODE.
-         *
-         */
-        SV_STATUS processMessage(lnMsg *LnPacket);
-
-        /**
-         * Attempts to send a reply to an SV programming message.
-         * This method will repeatedly try to send the message, until it succeeds.
-         *
-         * Returns:
-         *		SV_OK - Reply was successfully sent.
-         *		SV_DEFERRED_PROCESSING_NEEDED - Reply was not sent, a later retry is needed.
-         */
-        SV_STATUS doDeferredProcessing(void);
+        void reconfigure();
 };
 
 class LocoNetCV {
+    public:
+        //Call this method when you want to implement a module that can be configured via Uhlenbrock LNVC messages
+        LocoNetCV(LocoNet &locoNet);
+
+        /**
+         * Notification that an Discover message was sent. If a module wants to react to this,
+         * It should return LNCV_LACK_OK and set ArtNr and ModuleAddress accordingly.
+         * A response just as in the case of ProgrammingStart will be generated.
+         * If a module responds to a DiscoveryRequest, it should apparently enter programming mode immediately.
+         *                                              artNr     Address
+         */
+        void onDiscoveryRequest(std::function<int8_t(uint16_t &, uint16_t &)> callback) {
+            discoveryCallback = callback;
+        }
+        /**
+         * Notification that a ProgrammingStart message was received. Application code should process this message and
+         * set the return code to LNCV_LACK_OK in case this message was intended for this module (i.e., the addresses match).
+         * In case ArtNr and/or ModuleAddress were Broadcast addresses, the Application Code should replace them by their
+         * real values.
+         * The calling code will then generate an appropriate ACK message.
+         * A return code different than LACK_LNCV_OK will result in no response being sent.
+         *                                              artNr     Address
+         */
+        void onProgrammingStart(std::function<int8_t(uint16_t &, uint16_t &)> callback) {
+            progStartCallback = callback;
+        }
+        /**
+         * Notification that an CV Programming Stop message was received.
+         * This message is noch ACKed, thus does not require a result to be returned from the application.
+         *                                          artNr     Address
+         */
+        void onProgrammingStop(std::function<int8_t(uint16_t, uint16_t)> callback) {
+            progStopCallback = callback;
+        }
+        /**
+         * Notification that a CV read request message was received. Application code should process this message,
+         * set the cvValue (last param) to its respective value and set an appropriate return code.
+         * return LNCV_LACK_OK leads the calling code to create a response containing lncvValue.
+         * return code >= 0 leads to a NACK being sent.
+         * return code < 0 will result in no reaction.
+         *                                  artNr     CV       Return Value
+         */
+        void onCVRead(std::function<int8_t(uint16_t, uint16_t, uint16_t &)> callback) {
+            cvReadCallback = callback;
+        }
+        /**
+         * Notification that a CV value should be written. Application code should process this message and
+         * set an appropriate return code.
+         * Note 1: CV 0 is spec'd to be the ModuleAddress.
+         * Note 2: Changes to CV 0 must be reflected IMMEDIATELY! E.g. the programmingStop command will
+         * be sent using the new address.
+         *
+         * return codes >= 0 will result in a LACK containing the return code being sent.
+         * return codes < 0 will result in no reaction.
+         *                                  artNr     Address   CV value
+         */
+        void onCVWrite(std::function<int8_t(uint16_t, uint16_t, uint16_t)> callback) {
+            cvWriteCallback = callback;
+        }
     private:
         void makeLNCVresponse(UhlenbrockMsg & ub, uint8_t originalSource, uint16_t first, uint16_t second,
                 uint16_t third, uint8_t last);
-
         // Computes the PXCT byte from the data bytes in the given UhlenbrockMsg.
         void computePXCTFromBytes(UhlenbrockMsg & ub);
-
         // Computes the correct data bytes using the containes PXCT byte
         void computeBytesFromPXCT(UhlenbrockMsg & ub);
-
         // Computes an address from a low- and a high-byte
         uint16_t getAddress(uint8_t lower, uint8_t higher);
 
-        LocoNet *lnInstance;
+        LocoNet &_locoNet;
+        void processLNCVMessage(lnMsg *LnPacket);
 
-    public:
-        //Call this method when you want to implement a module that can be configured via Uhlenbrock LNVC messages
-        void init(LocoNet *lnInstance);
-        bool processLNCVMessage(lnMsg *LnPacket);
+        std::function<int8_t(uint16_t &, uint16_t &)> discoveryCallback;
+        std::function<int8_t(uint16_t &, uint16_t &)> progStartCallback;
+        std::function<int8_t(uint16_t, uint16_t)> progStopCallback;
+        std::function<int8_t(uint16_t, uint16_t, uint16_t &)> cvReadCallback;
+        std::function<int8_t(uint16_t, uint16_t, uint16_t)> cvWriteCallback;
 };
 
 /************************************************************************************
  Call-back functions
  ************************************************************************************/
-
-#if defined (__cplusplus)
-extern "C"
-{
-#endif
-
-extern void notifySensor(uint16_t Address, uint8_t State) __attribute__ ((weak));
-
-// Address: Switch Address.
-// Output: Value 0 for Coil Off, anything else for Coil On
-// Direction: Value 0 for Closed/GREEN, anything else for Thrown/RED
-extern void notifySwitchRequest(uint16_t Address, uint8_t Output, uint8_t Direction) __attribute__ ((weak));
-extern void notifySwitchReport(uint16_t Address, uint8_t Output, uint8_t Direction) __attribute__ ((weak));
-extern void notifySwitchState(uint16_t Address, uint8_t Output, uint8_t Direction) __attribute__ ((weak));
-extern void notifyPower(uint8_t State) __attribute__ ((weak));
-
-// Throttle notify Call-back functions
-extern void notifyThrottleAddress(uint8_t UserData, TH_STATE State, uint16_t Address, uint8_t Slot)
-        __attribute__ ((weak));
-extern void notifyThrottleSpeed(uint8_t UserData, TH_STATE State, uint8_t Speed) __attribute__ ((weak));
-extern void notifyThrottleDirection(uint8_t UserData, TH_STATE State, uint8_t Direction) __attribute__ ((weak));
-extern void notifyThrottleFunction(uint8_t UserData, uint8_t Function, uint8_t Value) __attribute__ ((weak));
-extern void notifyThrottleSlotStatus(uint8_t UserData, uint8_t Status) __attribute__ ((weak));
-extern void notifyThrottleError(uint8_t UserData, TH_ERROR Error) __attribute__ ((weak));
-extern void notifyThrottleState(uint8_t UserData, TH_STATE PrevState, TH_STATE State) __attribute__ ((weak));
-
-// FastClock notify Call-back functions
-extern void notifyFastClock(uint8_t Rate, uint8_t Day, uint8_t Hour, uint8_t Minute, uint8_t Sync)
-        __attribute__ ((weak));
-extern void notifyFastClockFracMins(uint16_t FracMins) __attribute__ ((weak));
-
-// System Variable notify Call-back functions
-extern void notifySVChanged(uint16_t Offset) __attribute__ ((weak));
 
 // LNCV notify Call-back functions
 
@@ -499,54 +621,3 @@ extern void notifySVChanged(uint16_t Offset) __attribute__ ((weak));
  * Pick an ArtNr
  * Implement your code to the following behaviour...
  */
-
-/**
- * Notification that an LNCVDiscover message was sent. If a module wants to react to this,
- * It should return LNCV_LACK_OK and set ArtNr and ModuleAddress accordingly.
- * A response just as in the case of notifyLNCVProgrammingStart will be generated.
- * If a module responds to a LNCVDiscover, it should apparently enter programming mode immediately.
- */
-extern int8_t notifyLNCVdiscover(uint16_t & ArtNr, uint16_t & ModuleAddress) __attribute__ ((weak));
-;
-
-/**
- * Notification that a LNCVProgrammingStart message was received. Application code should process this message and
- * set the return code to LNCV_LACK_OK in case this message was intended for this module (i.e., the addresses match).
- * In case ArtNr and/or ModuleAddress were Broadcast addresses, the Application Code should replace them by their
- * real values.
- * The calling code will then generate an appropriate ACK message.
- * A return code different than LACK_LNCV_OK will result in no response being sent.
- */
-extern int8_t notifyLNCVprogrammingStart(uint16_t & ArtNr, uint16_t & ModuleAddress) __attribute__ ((weak));
-
-/**
- * Notification that a LNCV read request message was received. Application code should process this message,
- * set the lncvValue to its respective value and set an appropriate return code.
- * return LNCV_LACK_OK leads the calling code to create a response containing lncvValue.
- * return code >= 0 leads to a NACK being sent.
- * return code < 0 will result in no reaction.
- */
-extern int8_t notifyLNCVread(uint16_t ArtNr, uint16_t lncvAddress, uint16_t, uint16_t & lncvValue)
-        __attribute__ ((weak));
-
-/**
- * Notification that a LNCV value should be written. Application code should process this message and
- * set an appropriate return code.
- * Note 1: LNCV 0 is spec'd to be the ModuleAddress.
- * Note 2: Changes to LNCV 0 must be reflected IMMEDIATELY! E.g. the programmingStop command will
- * be sent using the new address.
- *
- * return codes >= 0 will result in a LACK containing the return code being sent.
- * return codes < 0 will result in no reaction.
- */
-extern int8_t notifyLNCVwrite(uint16_t ArtNr, uint16_t lncvAddress, uint16_t lncvValue) __attribute__ ((weak));
-
-/**
- * Notification that an LNCV Programming Stop message was received.
- * This message is noch ACKed, thus does not require a result to be returned from the application.
- */
-extern void notifyLNCVprogrammingStop(uint16_t ArtNr, uint16_t ModuleAddress) __attribute__ ((weak));
-
-#if defined (__cplusplus)
-}
-#endif

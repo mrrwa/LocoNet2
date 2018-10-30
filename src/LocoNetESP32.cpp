@@ -28,9 +28,9 @@ LocoNetESP32::LocoNetESP32(uint8_t rxPin, uint8_t txPin, uint8_t timerId) : Loco
     locoNetInstance = this;
 }
 
-void LocoNetESP32::init() {
+void LocoNetESP32::begin() {
     // locoNetTaskCallback
-    xTaskCreate(locoNetTaskCallback, "LocoNetESP32Task", 1600, nullptr, 2, &xTaskToNotify);
+    xTaskCreate(locoNetTaskCallback, "LocoNetESP32Task", 1600, nullptr, 2, &_processingTask);
 
     /* Use one of the four ESP32 hardware timers.
      * Set divider for prescaler (see ESP32 Technical Reference Manual for more
@@ -46,13 +46,29 @@ void LocoNetESP32::init() {
 
     /* Start the timer. */
     timerAlarmEnable(_lnTimer);
-    
+
     /* set up the TX and RX pins */
     pinMode(_rxPin, INPUT_PULLUP);
     pinMode(_txPin, OUTPUT);
 
     /* attach the startbit interrup to the rx pin */
     attachInterrupt(digitalPinToInterrupt(_rxPin), locoNetStartBitCallback, RISING); //FALLING for real hardware
+}
+
+void LocoNetESP32::end() {
+    portENTER_CRITICAL_ISR(&_timerMux);
+    // shutdown the timer and associated callbacks
+    timerEnd(_lnTimer);
+
+    // remove ISR if present
+    detachInterrupt(digitalPinToInterrupt(_rxPin));
+
+    // stop the RX/TX task
+    vTaskSuspend(&_processingTask);
+
+    // terminate the RX/TX task
+    vTaskDelete(&_processingTask);
+    portEXIT_CRITICAL_ISR(&_timerMux);
 }
 
 /**************************************************************************
@@ -69,7 +85,7 @@ void LocoNetESP32::init() {
 void IRAM_ATTR LocoNetESP32::loconetStartBit() {
     /*declare a critical section so we can alter the data that is shared
      outside of the iSR*/
-    portENTER_CRITICAL_ISR(&timerMux);
+    portENTER_CRITICAL_ISR(&_timerMux);
 
     /* Disable the Start Bit interrupt */
     detachInterrupt(digitalPinToInterrupt(_rxPin));
@@ -79,12 +95,12 @@ void IRAM_ATTR LocoNetESP32::loconetStartBit() {
     timerRestart(_lnTimer);
 
     /* Set the State to indicate that we have begun to Receive */
-    lnState = LN_ST_RX;
+    _lnState = LN_ST_RX;
 
     /* Reset the bit counter so that on first increment it is on 0 */
-    lnBitCount = 0;
-    lnCurrentRxByte = 0;
-    portEXIT_CRITICAL_ISR(&timerMux);
+    _lnBitCount = 0;
+    _lnCurrentRxByte = 0;
+    portEXIT_CRITICAL_ISR(&_timerMux);
 }
 
 /**
@@ -95,35 +111,35 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     /* Increment the counter and set the time of ISR */
-    portENTER_CRITICAL_ISR(&timerMux);
+    portENTER_CRITICAL_ISR(&_timerMux);
 
     /* Make sure the timer is set correctly for the next round */
     timerAlarmWrite(_lnTimer, 10, true);
 
-    lnBitCount++;
+    _lnBitCount++;
 
     /* Notify the task that the one bit time has occured. */
-    vTaskNotifyGiveFromISR(xTaskToNotify, &xHigherPriorityTaskWoken);
+    vTaskNotifyGiveFromISR(_processingTask, &xHigherPriorityTaskWoken);
 
     /* Re-enable interrupts */
-    portEXIT_CRITICAL_ISR(&timerMux);
+    portEXIT_CRITICAL_ISR(&_timerMux);
 }
 
 #define BLOCK_ISR_FOR_BIT_STATE_CHANGE(newBitCount, newState) \
-portENTER_CRITICAL(&timerMux); \
-lnBitCount = newBitCount; \
-lnState = newState; \
-portEXIT_CRITICAL(&timerMux);
+portENTER_CRITICAL(&_timerMux); \
+_lnBitCount = newBitCount; \
+_lnState = newState; \
+portEXIT_CRITICAL(&_timerMux);
 
 #define BLOCK_ISR_FOR_BIT_CHANGE(newBitCount) \
-portENTER_CRITICAL(&timerMux); \
-lnBitCount = newBitCount; \
-portEXIT_CRITICAL(&timerMux);
+portENTER_CRITICAL(&_timerMux); \
+_lnBitCount = newBitCount; \
+portEXIT_CRITICAL(&_timerMux);
 
 #define BLOCK_ISR_FOR_STATE_CHANGE(newState) \
-portENTER_CRITICAL(&timerMux); \
-lnState = newState; \
-portEXIT_CRITICAL(&timerMux);
+portENTER_CRITICAL(&_timerMux); \
+_lnState = newState; \
+portEXIT_CRITICAL(&_timerMux);
 
 /**
  * LocoNetESP32::TaskRun()
@@ -135,11 +151,11 @@ portEXIT_CRITICAL(&timerMux);
 void LocoNetESP32::TaskRun() {
     while(true) {
         if(ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(200))) {
-            if(lnState == LN_ST_RX) {
-                if(lnBitCount < 10) {
-                    lnCurrentRxByte >>= 1;
+            if(_lnState == LN_ST_RX) {
+                if(_lnBitCount < 10) {
+                    _lnCurrentRxByte >>= 1;
                     if(digitalRead(_rxPin) == LOCONET_RX_HIGH) {
-                        lnCurrentRxByte |= 0x80;
+                        _lnCurrentRxByte |= 0x80;
                     }
                 } else {
                     /* The rx pin should not be low at this point,
@@ -147,17 +163,17 @@ void LocoNetESP32::TaskRun() {
                      * bus.*/
                     if(digitalRead(_rxPin) == LOCONET_RX_LOW) {
                         rxBuffer.stats.rxErrors++;
-                        lnCurrentRxByte = 0;
+                        _lnCurrentRxByte = 0;
                     } else {
                         /* Send of the received byte for processing */
-                        process(lnCurrentRxByte);
+                        consume(_lnCurrentRxByte);
                     }
                     BLOCK_ISR_FOR_BIT_STATE_CHANGE(0, LN_ST_CD_BACKOFF)
                     /* re-attach the start bit interrupt */
                     attachInterrupt(digitalPinToInterrupt(_rxPin), locoNetStartBitCallback, FALLING);
                 }
             }
-            if(lnState == LN_ST_TX) {
+            if(_lnState == LN_ST_TX) {
                 /* Are we in the TX State?
                  * To get to this point we have already begun the TX cycle so we need to
                  * first check for a Collision. */
@@ -165,32 +181,32 @@ void LocoNetESP32::TaskRun() {
                     /* Disable interrupts whilst the lnState is changed
                      * and the lnBitCount is reset. */
                     BLOCK_ISR_FOR_BIT_STATE_CHANGE(0, LN_ST_TX_COLLISION)
-                } else if(lnBitCount <= 1) {
+                } else if(_lnBitCount <= 1) {
                     /* Send the start bit */
                     digitalWrite(_txPin, LOCONET_TX_LOW);
-                } else if(lnBitCount <= 9) {
-                    if(lnCurrentTxByte & 0x01) {
+                } else if(_lnBitCount <= 9) {
+                    if(_lnCurrentTxByte & 0x01) {
                         digitalWrite(_txPin, LOCONET_TX_HIGH);
                     } else {
                         digitalWrite(_txPin, LOCONET_TX_LOW);
                     }
                     /* Get the next bit to transmit */
-                    lnCurrentTxByte >>= 1;
-                } else if(lnBitCount == 10) {
+                    _lnCurrentTxByte >>= 1;
+                } else if(_lnBitCount == 10) {
                     /* end o'clock  - send the stop bit*/
                     digitalWrite(_txPin, LOCONET_TX_HIGH);
-                } else if(!txBuffer.empty()) {
+                } else if(!_txBuffer.empty()) {
                     /* If there are still bytes to transmit
                      * get the next byte   */
-                    txBuffer.erase(txBuffer.cbegin());
-                    lnCurrentTxByte = txBuffer[0];
+                    _txBuffer.erase(_txBuffer.cbegin());
+                    _lnCurrentTxByte = _txBuffer[0];
                     BLOCK_ISR_FOR_BIT_CHANGE(0)
                 } else {
                     BLOCK_ISR_FOR_BIT_STATE_CHANGE(0, LN_ST_CD_BACKOFF)
                 }
             }
 
-            if(lnState == LN_ST_TX_COLLISION) {
+            if(_lnState == LN_ST_TX_COLLISION) {
                 /* Pull the TX Line low to indicate Collision */
                 digitalWrite(_txPin, LOCONET_TX_LOW);
 
@@ -199,11 +215,11 @@ void LocoNetESP32::TaskRun() {
                 timerAlarmWrite(_lnTimer, 150, true);
             }
 
-            if(lnState == LN_ST_CD_BACKOFF) {
-                if(lnBitCount == 0) {
+            if(_lnState == LN_ST_CD_BACKOFF) {
+                if(_lnBitCount == 0) {
                     /* Re-enable the start bit detection now that backoff is active */
                     attachInterrupt(digitalPinToInterrupt(_rxPin), locoNetStartBitCallback, FALLING);
-                } else if(lnBitCount >= LN_BACKOFF_MAX) {
+                } else if(_lnBitCount >= LN_BACKOFF_MAX) {
                     BLOCK_ISR_FOR_STATE_CHANGE(LN_ST_IDLE)
                 } 
             }
@@ -241,7 +257,7 @@ bool LocoNetESP32::CheckCollision() {
  *                   transmission.
  */
 LN_STATUS LocoNetESP32::sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay) {
-    std::copy(&packetData[0], &packetData[packetLen], back_inserter(txBuffer));
+    std::copy(&packetData[0], &packetData[packetLen], back_inserter(_txBuffer));
 
     /* clip maximum prio delay */
     if(ucPrioDelay > LN_BACKOFF_MAX) {
@@ -249,19 +265,19 @@ LN_STATUS LocoNetESP32::sendLocoNetPacketTry(uint8_t *packetData, uint8_t packet
     }
 
     /* Load the first Byte */
-    lnCurrentTxByte = txBuffer[0];
+    _lnCurrentTxByte = _txBuffer[0];
 
-    if(lnState == LN_ST_CD_BACKOFF) {
-        if(lnBitCount >= ucPrioDelay) {
+    if(_lnState == LN_ST_CD_BACKOFF) {
+        if(_lnBitCount >= ucPrioDelay) {
             BLOCK_ISR_FOR_STATE_CHANGE(LN_ST_IDLE)
-        } else if(lnBitCount < LN_CARRIER_TICKS) {
+        } else if(_lnBitCount < LN_CARRIER_TICKS) {
             return LN_CD_BACKOFF;
         } else {
             return LN_PRIO_BACKOFF;
         }
     }
 
-    if(lnState != LN_ST_IDLE) {
+    if(_lnState != LN_ST_IDLE) {
         /* neither idle nor backoff -> busy */
         return LN_NETWORK_BUSY;
     }
@@ -272,35 +288,42 @@ LN_STATUS LocoNetESP32::sendLocoNetPacketTry(uint8_t *packetData, uint8_t packet
      * our TX is an RX.     */
     detachInterrupt(digitalPinToInterrupt(_rxPin));
 
-    while(lnState == LN_ST_TX) {
+    while(_lnState == LN_ST_TX) {
         /* now busy - wait until the interrupts do the rest of the transmitting */
     }
-    if(lnState == LN_ST_CD_BACKOFF || lnState == LN_ST_IDLE) {
+    if(_lnState == LN_ST_CD_BACKOFF || _lnState == LN_ST_IDLE) {
         return LN_DONE;
-    } else if(lnState == LN_ST_TX_COLLISION) {
+    } else if(_lnState == LN_ST_TX_COLLISION) {
         return LN_COLLISION;
     }
     return LN_UNKNOWN_ERROR; // everything else is an error
 }
 
-uint8_t LocoNetSystemVariable::readSVStorage(uint16_t Offset ) {
-    if( Offset == SV_ADDR_EEPROM_SIZE) {
+uint8_t LocoNetSystemVariable::readSVStorage(uint16_t offset) {
+    if(offset == SV_ADDR_EEPROM_SIZE) {
         return 0xFF;
-    } else if( Offset == SV_ADDR_SW_VERSION ) {
-        return swVersion ;
-    } else {
-        Offset -= 2;    // Map SV Address to EEPROM Offset - Skip SV_ADDR_EEPROM_SIZE & SV_ADDR_SW_VERSION
-        return EEPROM.read((int)Offset);
-  }
+    } else if(offset == SV_ADDR_SW_VERSION) {
+        return _swVersion;
+    }
+    offset -= 2;    // Map SV Address to EEPROM Offset - Skip SV_ADDR_EEPROM_SIZE & SV_ADDR_SW_VERSION
+    return EEPROM.read(offset);
 }
 
-uint8_t LocoNetSystemVariable::writeSVStorage(uint16_t Offset, uint8_t Value) {
-    Offset -= 2;      // Map SV Address to EEPROM Offset - Skip SV_ADDR_EEPROM_SIZE & SV_ADDR_SW_VERSION
-    if( EEPROM.read((int)Offset) != Value )
-    {
-        EEPROM.write((int)Offset, Value);
-        if(notifySVChanged)
-            notifySVChanged(Offset+2);
+uint8_t LocoNetSystemVariable::writeSVStorage(uint16_t offset, uint8_t value) {
+    offset -= 2;      // Map SV Address to EEPROM Offset - Skip SV_ADDR_EEPROM_SIZE & SV_ADDR_SW_VERSION
+    uint8_t oldValue = EEPROM.read(offset);
+    if(oldValue != value) {
+        EEPROM.write(offset, value);
+        if(_svChangeCallback) {
+            _svChangeCallback(offset + 2, value, oldValue);
+        }
     }
-    return EEPROM.read((int)Offset);
+    return EEPROM.read(offset);
+}
+
+void LocoNetSystemVariable::reconfigure() {
+    // shutdown the LocoNet subsystems (required for ESP32 restart is a soft restart and ISRs will not be shutdown)
+    _locoNet.end();
+    // reset the esp32
+    esp_restart();
 }

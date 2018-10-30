@@ -80,6 +80,12 @@ const char * LoconetStatusStrings[] = {
 LocoNet::LocoNet() {
 }
 
+void LocoNet::begin() {
+}
+
+void LocoNet::end() {
+}
+
 const char* LocoNet::getStatusStr(LN_STATUS Status) {
   if ((Status >= LN_CD_BACKOFF) && (Status <= LN_RETRY_ERROR)) {
     return LoconetStatusStrings[Status];
@@ -160,114 +166,71 @@ LnTxStats* LocoNet::getTxStats(void) {
   return &txStats;
 }
 
-LN_STATUS LocoNet::reportPower(uint8_t State) {
-  lnMsg SendPacket ;
+LN_STATUS LocoNet::reportPower(bool state) {
+  lnMsg SendPacket;
 
-  if (State) {
-    SendPacket.data[ 0 ] = OPC_GPON ;
+  if (state) {
+    SendPacket.data[ 0 ] = OPC_GPON;
   } else {
-    SendPacket.data[ 0 ] = OPC_GPOFF ;
+    SendPacket.data[ 0 ] = OPC_GPOFF;
   }
 
   return send( &SendPacket ) ;
 }
 
-bool LocoNet::process() {
-	return false;
-}
-
-bool LocoNet::process(uint8_t newByte) {
-	bool isConsumed = false;
-	lnMsg * rxPacket = rxBuffer.addByte( newByte);
+void LocoNet::consume(uint8_t newByte) {
+	lnMsg * rxPacket = rxBuffer.addByte(newByte);
 
 	if (rxPacket) {
-    if(callbacks.find(0xFF) != callbacks.end()) {
-      for(auto cb : callbacks[0xFF]) {
-        if(cb(rxPacket)) {
-          isConsumed = true;
-        }
+    if(callbacks.find(CALLBACK_FOR_ALL_OPCODES) != callbacks.end()) {
+      for(auto cb : callbacks[CALLBACK_FOR_ALL_OPCODES]) {
+        cb(rxPacket);
       }
     }
     if(callbacks.find(rxPacket->sz.command) != callbacks.end()) {
       for(auto cb : callbacks[rxPacket->sz.command]) {
-        if(cb(rxPacket)) {
-          isConsumed = true;
-        }
+        cb(rxPacket);
       }
     }
-    if(!isConsumed) {
-		  isConsumed = processSwitchSensorMessage(rxPacket);
-    }
 	}
-
-	return isConsumed;
 }
 
-bool LocoNet::processSwitchSensorMessage( lnMsg *LnPacket ) {
-  uint16_t Address ;
-  uint8_t  Direction ;
-  uint8_t  Output ;
-  bool  isConsumed = true ;
-
-  Address = (LnPacket->srq.sw1 | ( ( LnPacket->srq.sw2 & 0x0F ) << 7 )) ;
-  if( LnPacket->sr.command != OPC_INPUT_REP ) {
-    Address++;
-  }
-
-  switch( LnPacket->sr.command ) {
-  case OPC_INPUT_REP:
-    Address <<= 1 ;
-    Address += ( LnPacket->ir.in2 & OPC_INPUT_REP_SW ) ? 2 : 1 ;
-
-    if(notifySensor)
-      notifySensor( Address, LnPacket->ir.in2 & OPC_INPUT_REP_HI ) ;
-    break ;
-
-  case OPC_GPON:
-    if(notifyPower)
-      notifyPower( 1 );
-    break ;
-
-  case OPC_GPOFF:
-    if(notifyPower)
-      notifyPower( 0 );
-    break ;
-
-  case OPC_SW_REQ:
-    if(notifySwitchRequest)
-      notifySwitchRequest( Address, LnPacket->srq.sw2 & OPC_SW_REQ_OUT, LnPacket->srq.sw2 & OPC_SW_REQ_DIR ) ;
-    break ;
-
-  case OPC_SW_REP:
-    if(notifySwitchReport)
-      notifySwitchReport( Address, LnPacket->srp.sn2 & OPC_SW_REP_HI, LnPacket->srp.sn2 & OPC_SW_REP_SW ) ;
-    break ;
-
-  case OPC_SW_STATE:
-    Direction = LnPacket->srq.sw2 & OPC_SW_REQ_DIR ;
-    Output = LnPacket->srq.sw2 & OPC_SW_REQ_OUT ;
-
-    if(notifySwitchState)
-      notifySwitchState( Address, Output, Direction ) ;
-    break;
-
-  case OPC_SW_ACK:
-    break ;
-
-  case OPC_LONG_ACK:
-    if( LnPacket->lack.opcode == (OPC_SW_STATE & 0x7F ) ) {
-      Direction = LnPacket->lack.ack1 & 0x01 ;
-    } else {
-      isConsumed = false;
-    }
-    break;
-
-  default:
-    isConsumed = false;
-  }
-
-  return isConsumed ;
+void LocoNet::onSensorChange(std::function<void(uint16_t, bool)> callback) {
+  onPacket(OPC_INPUT_REP, [callback](lnMsg *packet) {
+    uint16_t address = (packet->srq.sw1 | ((packet->srq.sw2 & 0x0F ) << 7));
+    address <<= 1 ;
+    address += (packet->ir.in2 & OPC_INPUT_REP_SW) ? 2 : 1;
+    callback(address, packet->ir.in2 & OPC_INPUT_REP_HI);
+  });
 }
+void LocoNet::onSwitchRequest(std::function<void(uint16_t, bool, bool)> callback) {
+  onPacket(OPC_SW_REQ, [callback](lnMsg *packet) {
+    uint16_t address = (packet->srq.sw1 | ((packet->srq.sw2 & 0x0F ) << 7)) + 1;
+    callback(address, packet->srq.sw2 & OPC_SW_REQ_OUT, packet->srq.sw2 & OPC_SW_REQ_DIR);
+  });
+}
+void LocoNet::onSwitchReport(std::function<void(uint16_t, bool, bool)> callback) {
+  onPacket(OPC_SW_REP, [callback](lnMsg *packet) {
+    uint16_t address = (packet->srq.sw1 | ((packet->srq.sw2 & 0x0F ) << 7)) + 1;
+    callback(address, packet->srq.sw2 & OPC_SW_REP_HI, packet->srq.sw2 & OPC_SW_REP_SW);
+  });
+}
+void LocoNet::onSwitchState(std::function<void(uint16_t, bool, bool)> callback) {
+  onPacket(OPC_SW_STATE, [callback](lnMsg *packet) {
+    uint16_t address = (packet->srq.sw1 | ((packet->srq.sw2 & 0x0F ) << 7)) + 1;
+    callback(address, packet->srq.sw2 & OPC_SW_REQ_OUT, packet->srq.sw2 & OPC_SW_REQ_DIR);
+  });
+}
+
+void LocoNet::onPowerChange(std::function<void(bool)> callback) {
+  onPacket(OPC_GPON, [callback](lnMsg *packet) {
+    callback(true);
+  });
+  onPacket(OPC_GPON, [callback](lnMsg *packet) {
+    callback(false);
+  });
+}
+
 
 LN_STATUS LocoNet::requestSwitch( uint16_t Address, uint8_t Output, uint8_t Direction ) {
   uint8_t AddrH = (--Address >> 7) & 0x0F ;
@@ -303,6 +266,6 @@ LN_STATUS LocoNet::reportSensor( uint16_t Address, uint8_t State ) {
   return send( OPC_INPUT_REP, AddrL, AddrH ) ;
 }
 
-void LocoNet::onPacket(uint8_t OpCode, OpCodeCallbackFunction callback) {
+void LocoNet::onPacket(uint8_t OpCode, std::function<void(lnMsg *)> callback) {
   callbacks[OpCode].push_back(callback);
 }

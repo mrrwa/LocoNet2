@@ -51,15 +51,24 @@
 
 class LocoNetESP32: public LocoNet
 {
-    private:
-        std::vector<uint8_t> txBuffer;
-        uint8_t lnCurrentTxByte;
+    public:
+        LocoNetESP32(uint8_t rxPin=16, uint8_t txPin=15, uint8_t timerId=0);
+        virtual void begin();
+        virtual void end();
 
-        volatile uint8_t lnState;
-        portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-        volatile uint8_t lnCurrentRxByte;
-        volatile uint8_t lnBitCount;
-        TaskHandle_t xTaskToNotify;
+        LN_STATUS sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay);
+        void IRAM_ATTR loconetStartBit();
+        void IRAM_ATTR loconetBitTimer();
+        void TaskRun();
+    private:
+        std::vector<uint8_t> _txBuffer;
+        uint8_t _lnCurrentTxByte;
+
+        volatile uint8_t _lnState;
+        portMUX_TYPE _timerMux = portMUX_INITIALIZER_UNLOCKED;
+        volatile uint8_t _lnCurrentRxByte;
+        volatile uint8_t _lnBitCount;
+        TaskHandle_t _processingTask;
         hw_timer_t * _lnTimer;
 
         const uint8_t _rxPin;
@@ -73,14 +82,5 @@ class LocoNetESP32: public LocoNet
             LOCONET_RX_LOW=LOW,
             LOCONET_RX_HIGH=HIGH
         };
-
-    public:
-        LocoNetESP32(uint8_t rxPin=16, uint8_t txPin=15, uint8_t timerId=0);
-        void init();
-
-        LN_STATUS sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay);
-        void IRAM_ATTR loconetStartBit();
-        void IRAM_ATTR loconetBitTimer();
         bool CheckCollision();
-        void TaskRun();
 };
