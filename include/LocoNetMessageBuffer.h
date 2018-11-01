@@ -64,20 +64,18 @@
 #define LN_BUF_SIZE (sizeof(lnMsg))
 #endif
 
-class LocoNetMessageBuffer
-{
+class LocoNetMessageBuffer {
   private:
-	uint8_t     		buffer[ LN_BUF_SIZE ] ;
-  	uint8_t     		index ;
-  	uint8_t     		checkSum ;
-  	uint8_t     		expLen ;
+	uint8_t     		buffer[LN_BUF_SIZE];
+  	uint8_t     		index;
+  	uint8_t     		checkSum;
+  	uint8_t     		expLen;
+	lnMsg 			*getMsg();
+	static uint8_t	getMsgSize(volatile lnMsg *Msg);
 
   public:
   	LocoNetMessageBuffer();
-	void 			init(void) ;
-	lnMsg 			*getMsg(void) ;
-	static uint8_t	getMsgSize(volatile lnMsg *Msg);
-	lnMsg 			*addByte(uint8_t newByte );
+	lnMsg 			*addByte(uint8_t newByte);
 
   	LnRxStats  		stats ;
 };

@@ -72,6 +72,20 @@
 #include "ln_opc.h"
 #include "LocoNetMessageBuffer.h"
 
+
+//#define DEBUG_OUTPUT
+
+#ifdef DEBUG_OUTPUT
+#if defined(ESP32) && defined(DEBUG_OUTPUT)
+#include <esp32-hal-log.h>
+#define DEBUG(format, ...) log_d(__VA_ARGS__)
+#else
+#define DEBUG(format, ...) printf(__VA_ARGS__)
+#endif
+#else
+#define DEBUG(format, ...)
+#endif
+
 typedef enum
 {
     LN_CD_BACKOFF = 0, LN_PRIO_BACKOFF, LN_NETWORK_BUSY, LN_DONE, LN_COLLISION, LN_UNKNOWN_ERROR, LN_RETRY_ERROR
@@ -157,6 +171,20 @@ class LocoNet {
          *                                    on/off
          */
         void onPowerChange(std::function<void(bool)> callback);
+
+        /**
+         * Registers a callback for when a MultiSense device reports status
+         *                                             id       index   AR/CB  Active
+         * AR = Auto-Reversing (true)
+         * CB = Circuit Breaker (false)
+         */
+        void onMultiSenseDeviceInfo(std::function<void(uint8_t, uint8_t, bool, bool)> callback);
+
+        /**
+         * Registers a callback for when a MultiSense Transponder event is triggered
+         *                                              address    zone    locoaddr  presense
+         */
+        void onMultiSenseTransponder(std::function<void(uint16_t, uint8_t, uint16_t, bool)> callback);
     protected:
         void consume(uint8_t newByte);
 
@@ -195,7 +223,7 @@ class LocoNetThrottle {
         /**
          * Registers a callback for when the address for this throttle changes
          */
-        void onAddressChange(std::function<void(LocoNetThrottle *, uint16_t)> callback) {
+        void onAddressChange(std::function<void(LocoNetThrottle *, uint16_t, uint16_t)> callback) {
             addressChangeCallback = callback;
         }
         /**
@@ -279,7 +307,7 @@ class LocoNetThrottle {
         void updateStatus1(uint8_t Status, uint8_t ForceNotify);
         void updateDirectionAndFunctions(uint8_t DirFunc0to4, uint8_t ForceNotify);
         void updateFunctions5to8(uint8_t Func5to8, uint8_t ForceNotify);
-        std::function<void(LocoNetThrottle *, uint16_t)> addressChangeCallback;
+        std::function<void(LocoNetThrottle *, uint16_t, uint16_t)> addressChangeCallback;
         std::function<void(LocoNetThrottle *, uint8_t)> speedChangeCallback;
         std::function<void(LocoNetThrottle *, uint8_t, bool)> functionChangeCallback;
         std::function<void(LocoNetThrottle *, uint8_t)> directionChangeCallback;

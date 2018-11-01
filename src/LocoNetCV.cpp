@@ -52,6 +52,7 @@
  *****************************************************************************/
 
 #include "LocoNet.h"
+#include <Arduino.h>
 
 // Adresses for the 'SRC' part of an UhlenbrockMsg
 #define LNCV_SRC_MASTER 0x00
@@ -87,40 +88,6 @@
 #define LNCV_FLAG_RO 0x01
 // other flags are currently unused
 
-//#define DEBUG_OUTPUT
-#undef DEBUG_OUTPUT
-
-#ifdef DEBUG_OUTPUT
-//#define DEBUG(x) Serial.print(F(x))
-#define DEBUG(x) Serial.print(x)
-#else
-#define DEBUG(x)
-#endif
-
-#ifdef DEBUG_OUTPUT
-void printPacket(lnMsg* LnPacket) {
-  Serial.print("LoconetPacket ");
-  Serial.print(LnPacket->ub.command, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.mesg_size, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.SRC, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.DSTL, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.DSTH, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.ReqId, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.PXCT1, HEX);
-  for (int i(0); i < 7; ++i) {
-    Serial.print(" ");
-    Serial.print(LnPacket->ub.payload.D[i], HEX);
-  }
-  Serial.print("\n");
-}
-#endif
-
 LocoNetCV::LocoNetCV(LocoNet &locoNet) : _locoNet(locoNet) {
     _locoNet.onPacket(OPC_IMM_PACKET, std::bind(&LocoNetCV::processLNCVMessage, this, std::placeholders::_1));
     _locoNet.onPacket(OPC_PEER_XFER, std::bind(&LocoNetCV::processLNCVMessage, this, std::placeholders::_1));
@@ -133,18 +100,11 @@ void LocoNetCV::processLNCVMessage(lnMsg * LnPacket) {
     if (LnPacket->ub.mesg_size == 15 && LnPacket->ub.DSTL == LNCV_MODULE_DSTL && LnPacket->ub.DSTH == LNCV_MODULE_DSTH) {
         // It is a LNCV programming message
         computeBytesFromPXCT(LnPacket->ub);
-        #ifdef DEBUG_OUTPUT
-        Serial.print("Message bytes: ");
-        Serial.print(LnPacket->ub.ReqId);
-        Serial.write(" ");
-        Serial.print(LnPacket->ub.payload.data.deviceClass, HEX);
-        Serial.write(" ");
-        Serial.print(LnPacket->ub.payload.data.lncvNumber, HEX);
-        Serial.write(" ");
-        Serial.print(LnPacket->ub.payload.data.lncvValue, HEX);
-        Serial.write("\n");
-        #endif
-
+        DEBUG("Message bytes: %d %x %x %x\n",
+            LnPacket->ub.ReqId,
+            LnPacket->ub.payload.data.deviceClass,
+            LnPacket->ub.payload.data.lncvNumber,
+            LnPacket->ub.payload.data.lncvValue);
         lnMsg response;
 
         switch (LnPacket->ub.ReqId) {
@@ -192,25 +152,26 @@ void LocoNetCV::processLNCVMessage(lnMsg * LnPacket) {
                     if (progStartCallback) {
                         DEBUG(" executing...");
                         if (progStartCallback(LnPacket->ub.payload.data.deviceClass, LnPacket->ub.payload.data.lncvValue) == LNCV_LACK_OK) {
-                            DEBUG("LNCV_LACK_OK ");
-                            DEBUG(LnPacket->ub.payload.data.deviceClass);
-                            DEBUG(" ");
-                            DEBUG(LnPacket->ub.payload.data.lncvValue);
-                            DEBUG("\n");
+                            DEBUG("LNCV_LACK_OK %x %x\n", LnPacket->ub.payload.data.deviceClass, LnPacket->ub.payload.data.lncvValue);
                             makeLNCVresponse(response.ub, LnPacket->ub.SRC, LnPacket->ub.payload.data.deviceClass, 0x00, LnPacket->ub.payload.data.lncvValue, 0x80);
-            // TODO:::uncomment next line
-                            //delay(10); // for whatever reason, we need to delay, otherwise the message will not be sent.
-                            #ifdef DEBUG_OUTPUT
-                            printPacket(&response);
-                            #endif
-                            LN_STATUS status = _locoNet.send(&response);
-                            #ifdef DEBUG_OUTPUT
-                            Serial.print(F("Return Code from Send: "));
-                            Serial.print(status, HEX);
-                            Serial.print("\n");
-                            #else
-                            status = status; // Avoid Compiler Warnings about unused variable
-                            #endif
+                            delay(10); // for whatever reason, we need to delay, otherwise the message will not be sent.
+                            DEBUG("LoconetPacket: %x %x %x %x %x %x %x %x %x %x %x %x %x %x\n",
+                                response.ub.command,
+                                response.ub.mesg_size,
+                                response.ub.SRC,
+                                response.ub.DSTL,
+                                response.ub.DSTH,
+                                response.ub.ReqId,
+                                response.ub.PXCT1,
+                                response.ub.payload.D[0],
+                                response.ub.payload.D[1],
+                                response.ub.payload.D[2],
+                                response.ub.payload.D[3],
+                                response.ub.payload.D[4],
+                                response.ub.payload.D[5],
+                                response.ub.payload.D[6],
+                                );
+                            DEBUG("Return Code from Send: %x\n", _locoNet.send(&response));
                         } else { // not for us? then no reaction!
                             DEBUG("Ignoring.\n");
                         }
@@ -218,11 +179,9 @@ void LocoNetCV::processLNCVMessage(lnMsg * LnPacket) {
                         DEBUG(" NOT EXECUTING!");
                     }
                 }
-                if ((LnPacket->ub.payload.data.flags & LNCV_FLAG_PROFF) != 0x00) {
+                if ((LnPacket->ub.payload.data.flags & LNCV_FLAG_PROFF) != 0x00 && progStopCallback) {
                     // LNCV PROGRAMMING END
-                    if (progStopCallback) {
-                        progStopCallback(LnPacket->ub.payload.data.deviceClass, LnPacket->ub.payload.data.lncvValue);
-                    }
+                    progStopCallback(LnPacket->ub.payload.data.deviceClass, LnPacket->ub.payload.data.lncvValue);
                 }
                 // Read-Only mode not implmeneted.
             }
@@ -238,7 +197,6 @@ void LocoNetCV::processLNCVMessage(lnMsg * LnPacket) {
                 }
             }
         break;
-
         }
     }
 }

@@ -59,8 +59,7 @@
 
 #define		LN_CHECKSUM_SEED        (uint8_t)0xFF
 
-LocoNetMessageBuffer::LocoNetMessageBuffer()
-{
+LocoNetMessageBuffer::LocoNetMessageBuffer() {
 	for(int i = 0; i < LN_BUF_SIZE; i++) {
 		buffer[i] = 0;
 	}
@@ -71,24 +70,21 @@ LocoNetMessageBuffer::LocoNetMessageBuffer()
 	stats.rxPackets = 0;
 }
 
-lnMsg *LocoNetMessageBuffer::getMsg(void)
-{
-	if( index < 2)
+lnMsg *LocoNetMessageBuffer::getMsg() {
+	if( index < 2) {
 		return nullptr;
+	}
 
-	if(!expLen)
+	if(!expLen) {
 			// If it's a fixed length packet, compute the length from the OPC_Code, else get the length from the byte 1
 		expLen = ( ( buffer[0] & (uint8_t)0x60 ) == (uint8_t)0x60 ) ? buffer[1] : ( ( buffer[0] & (uint8_t)0x60 ) >> (uint8_t)4 ) + (uint8_t)2 ;
+	}
 
-	if(expLen == index)
-	{
-		if(checkSum == buffer[index-1])
-		{
+	if(expLen == index) {
+		if(checkSum == buffer[index-1]) {
 			stats.rxPackets++;
 			return (lnMsg*)buffer;
-		}
-		else
-		{
+		} else {
 			stats.rxErrors++;
 		}
 	}
@@ -96,27 +92,20 @@ lnMsg *LocoNetMessageBuffer::getMsg(void)
 	return nullptr;
 }
 
-uint8_t LocoNetMessageBuffer::getMsgSize( volatile lnMsg * Msg )
-{
-	return ( ( Msg->sz.command & (uint8_t)0x60 ) == (uint8_t)0x60 ) ? Msg->sz.mesg_size : ( ( Msg->sz.command & (uint8_t)0x60 ) >> (uint8_t)4 ) + 2 ;
+uint8_t LocoNetMessageBuffer::getMsgSize(volatile lnMsg * Msg) {
+	return ((Msg->sz.command & 0x60 ) == 0x60 ) ? Msg->sz.mesg_size : ((Msg->sz.command & 0x60 ) >> 4) + 2;
 }
 
-lnMsg *LocoNetMessageBuffer::addByte(uint8_t newByte )
-{
-	if(index < LN_BUF_SIZE)
-	{
+lnMsg *LocoNetMessageBuffer::addByte(uint8_t newByte) {
+	if(index < LN_BUF_SIZE) {
 		// Reset the buffer to empty when a LocoNet OPC code is received
-		if(newByte & 0x80)
-		{
+		if(newByte & 0x80) {
 			index = 0;
 			expLen = 0;
 			checkSum = LN_CHECKSUM_SEED;
 		}
-
-		buffer[ index++ ] = newByte ;
-
-		if((index <= 2 ) || (index < expLen))
-		{
+		buffer[index++] = newByte;
+		if((index <= 2 ) || (index < expLen)) {
 		    checkSum ^= newByte;
 		}
 	}

@@ -170,14 +170,7 @@ SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket) {
     return SV_NOT_CONSUMED;
   }
   decodePeerData(&LnPacket->px, unData.abPlain);
-#ifdef DEBUG_SV
-    Serial.print("LNSV Src: ");
-    Serial.print(LnPacket->sv.src);
-    Serial.print("  Dest: ");
-    Serial.print(unData.stDecoded.unDestinationId.w);
-    Serial.print("  CMD: ");
-    Serial.println(LnPacket->sv.sv_cmd, HEX);
-#endif
+  DEBUG("LNSV Src: %d  Dest: %d  CMD: %x", LnPacket->sv.src, unData.stDecoded.unDestinationId.w, LnPacket->sv.sv_cmd);
   if ((LnPacket->sv.sv_cmd != SV_DISCOVER) &&
       (LnPacket->sv.sv_cmd != SV_CHANGE_ADDRESS) &&
       (unData.stDecoded.unDestinationId.w != readSVNodeId())) {
@@ -260,10 +253,7 @@ SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket) {
   encodePeerData(&LnPacket->px, unData.abPlain); // recycling the received packet
   LnPacket->sv.sv_cmd |= 0x40;    // flag the message as reply
   LN_STATUS lnStatus = _locoNet.send(LnPacket, LN_BACKOFF_INITIAL);
-#ifdef DEBUG_SV
-  Serial.print("LNSV Send Response - Status: ");
-  Serial.println(lnStatus);   // report status value from send attempt
-#endif
+  DEBUG("LNSV Send Response - Status: %d", lnStatus);
 
   if (lnStatus != LN_DONE) {
     // failed to send the SV reply message.  Send will NOT be re-tried.

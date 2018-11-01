@@ -159,6 +159,30 @@
 #define UPPER_4K_ADDR_MASK  0x0F /* Address bits A10 to A7 */
 #define UPPER_4K_ADDR_SHIFT 0x7
 
+#define OPC_MULTI_SENSE_MSG           0x60 /* byte 1                          */
+#define OPC_MULTI_SENSE_ABSENT        0x00 /* MSG field: transponder lost     */
+#define OPC_MULTI_SENSE_PRESENT       0x20 /* MSG field: transponder seen     */
+#define OPC_MULTI_SENSE_DEVICE_INFO   0x60 /* MSG field: Device Info Message  */
+constexpr uint8_t OPC_MULTI_SENSE_ZONE_MASK = 0x0F;
+#define OPC_MULTI_SENSE_ZONE_ID(zone) \
+    (zone & OPC_MULTI_SENSE_ZONE_MASK) == 0x00 ? 'A' : \
+    (zone & OPC_MULTI_SENSE_ZONE_MASK) == 0x02 ? 'B' : \
+    (zone & OPC_MULTI_SENSE_ZONE_MASK) == 0x04 ? 'C' : \
+    (zone & OPC_MULTI_SENSE_ZONE_MASK) == 0x06 ? 'D' : \
+    (zone & OPC_MULTI_SENSE_ZONE_MASK) == 0x08 ? 'E' : \
+    (zone & OPC_MULTI_SENSE_ZONE_MASK) == 0x0A ? 'F' : \
+    (zone & OPC_MULTI_SENSE_ZONE_MASK) == 0x0C ? 'G' : \
+    (zone & OPC_MULTI_SENSE_ZONE_MASK) == 0x0E ? 'H' : \
+    (zone & OPC_MULTI_SENSE_ZONE_MASK)
+#define OPC_MULTI_SENSE_BOARD_ID(arg1, arg2) \
+    arg2 + 1 + (arg1 & 0x01) ? 128 : 0
+#define OPC_MULTI_SENSE_BOARD_ADDRESS(zone, type) \
+    zone + (type & 0x1F << 7) + 1
+#define OPC_MULTI_SENSE_LOCO_ADDRESS(adr1, adr2) \
+    adr2 + adr1 != 0x7D ? adr1 << 7 : 0
+#define OPC_MULTI_SENSE_PRESENCE(zone) \
+    zone & OPC_MULTI_SENSE_PRESENT
+
 /* Slot Status byte definitions and macros */
 /***********************************************************************************
 *   D7-SL_SPURGE    ; 1=SLOT purge en,                                             *
@@ -606,32 +630,54 @@ typedef struct
 	uint8_t analog_4;   // ls 7 bits analog value (ms bits where???)
 } AnalogIoMsg;
 
+/* multi sense transponding */
+typedef struct multisense_transponder_t {
+	uint8_t command;
+	uint8_t type;          /* multi sense type                                     */
+	uint8_t zone;          /* zone and section                                     */
+	uint8_t adr1;          /* ls of address                                        */
+	uint8_t adr2;          /* ms of address                                        */
+	uint8_t chksum;        /* exclusive-or checksum for the message                */
+} multiSenseTranspMsg;
+
+/* muli sense device info */
+typedef struct multisense_deviceinfo_t {
+	uint8_t command;
+	uint8_t arg1;          /* first byte                                           */
+	uint8_t arg2;          /* second byte                                          */
+	uint8_t arg3;          /* third byte                                           */
+	uint8_t arg4;          /* fourth byte                                          */
+	uint8_t chksum;        /* exclusive-or checksum for the message                */
+} multiSenseDeviceInfoMsg;
+
 typedef union {
-		locoAdrMsg		la;
-		switchAckMsg	sa;
-		slotReqMsg		sr;
-		slotMoveMsg		sm;
-		consistFuncMsg	cf;
-		slotStatusMsg 	ss;
-		longAckMsg	 	lack;
-		inputRepMsg		ir;
-		swRepMsg		srp;
-		swReqMsg		srq;
-		locoDataMsg		ld;
-		locoSndMsg		ls;
-		locoDirfMsg		ldf;
-		locoSpdMsg		lsp;
-		rwSlotDataMsg	sd;
-		fastClockMsg	fc;
-		progTaskMsg		pt;
-		peerXferMsg		px;
-		sendPktMsg		sp;
-		svMsg			sv;
-		szMsg			sz;
-		seMsg			se;
-		UhlenbrockMsg   ub;
-		AnalogIoMsg     anio;
-		uint8_t			data[16];
+		locoAdrMsg				la;
+		switchAckMsg			sa;
+		slotReqMsg				sr;
+		slotMoveMsg				sm;
+		consistFuncMsg			cf;
+		slotStatusMsg			ss;
+		longAckMsg				lack;
+		inputRepMsg				ir;
+		swRepMsg				srp;
+		swReqMsg				srq;
+		locoDataMsg				ld;
+		locoSndMsg				ls;
+		locoDirfMsg				ldf;
+		locoSpdMsg				lsp;
+		rwSlotDataMsg			sd;
+		fastClockMsg			fc;
+		progTaskMsg				pt;
+		peerXferMsg				px;
+		sendPktMsg				sp;
+		svMsg					sv;
+		szMsg					sz;
+		seMsg					se;
+		UhlenbrockMsg			ub;
+		AnalogIoMsg				anio;
+		multiSenseTranspMsg		mstr;
+		multiSenseDeviceInfoMsg	msdi;
+		uint8_t					data[16];
 } lnMsg ;
 
 /* loconet opcodes */
@@ -656,6 +702,7 @@ typedef union {
 #define OPC_SW_STATE      0xbc
 #define OPC_SW_ACK        0xbd
 #define OPC_LOCO_ADR      0xbf
+#define OPC_MULTI_SENSE   0xd0
 #define OPC_PEER_XFER     0xe5
 #define OPC_SL_RD_DATA    0xe7
 #define OPC_IMM_PACKET    0xed

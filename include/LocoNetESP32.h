@@ -38,6 +38,7 @@
 
 #include "LocoNet.h"
 #include <esp32-hal-timer.h>
+#include <deque>
 
 #define RX_BUFFER_SIZE	64
 #define LN_ST_IDLE            0   // net is free for anyone to start transmission
@@ -61,7 +62,7 @@ class LocoNetESP32: public LocoNet
         void IRAM_ATTR loconetBitTimer();
         void TaskRun();
     private:
-        std::vector<uint8_t> _txBuffer;
+        std::deque<uint8_t> _txBuffer;
         uint8_t _lnCurrentTxByte;
 
         volatile uint8_t _lnState;

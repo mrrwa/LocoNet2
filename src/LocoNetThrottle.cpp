@@ -95,7 +95,7 @@ void LocoNetThrottle::updateAddress(uint16_t Address, uint8_t ForceNotify) {
     uint16_t oldAddess = _address;
     _address = Address;
     if(addressChangeCallback) {
-		  addressChangeCallback(this, oldAddess);
+		  addressChangeCallback(this, _address, oldAddess);
     }
   }
 }
