@@ -76,9 +76,9 @@
 //#define DEBUG_OUTPUT
 
 #ifdef DEBUG_OUTPUT
-#if defined(ESP32) && defined(DEBUG_OUTPUT)
+#if defined(ESP32)
 #include <esp32-hal-log.h>
-#define DEBUG(format, ...) log_d(__VA_ARGS__)
+#define DEBUG log_d
 #else
 #define DEBUG(format, ...) printf(__VA_ARGS__)
 #endif

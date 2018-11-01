@@ -165,7 +165,6 @@ portEXIT_CRITICAL(&_timerMux);
 void LocoNetESP32::TaskRun() {
     while(true) {
         if(ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(200))) {
-            DEBUG("Waking Up for next bit");
             if(_lnState == LN_ST_RX) {
                 DEBUG("RX");
                 if(_lnBitCount < 10) {

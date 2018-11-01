@@ -169,8 +169,7 @@ void LocoNetCV::processLNCVMessage(lnMsg * LnPacket) {
                                 response.ub.payload.D[3],
                                 response.ub.payload.D[4],
                                 response.ub.payload.D[5],
-                                response.ub.payload.D[6],
-                                );
+                                response.ub.payload.D[6]);
                             DEBUG("Return Code from Send: %x\n", _locoNet.send(&response));
                         } else { // not for us? then no reaction!
                             DEBUG("Ignoring.\n");
