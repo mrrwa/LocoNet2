@@ -71,7 +71,6 @@ class LocoNetMessageBuffer {
   	uint8_t     		checkSum;
   	uint8_t     		expLen;
 	lnMsg 			*getMsg();
-	static uint8_t	getMsgSize(volatile lnMsg *Msg);
 
   public:
   	LocoNetMessageBuffer();

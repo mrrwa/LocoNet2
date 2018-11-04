@@ -72,18 +72,18 @@
 #include "ln_opc.h"
 #include "LocoNetMessageBuffer.h"
 
-
-//#define DEBUG_OUTPUT
-
 #ifdef DEBUG_OUTPUT
-#if defined(ESP32)
+#if defined(ESP32) && ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
 #include <esp32-hal-log.h>
-#define DEBUG log_d
+#define DEBUG(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
+#define DEBUG_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
 #else
-#define DEBUG(format, ...) printf(__VA_ARGS__)
+#define DEBUG printf
+#define DEBUG_ISR printf
 #endif
 #else
 #define DEBUG(format, ...)
+#define DEBUG_ISR(format, ...)
 #endif
 
 typedef enum
@@ -123,6 +123,9 @@ constexpr uint8_t LN_BACKOFF_MAX        = (LN_BACKOFF_INITIAL + 10);            
 #define LN_TX_RETRIES_MAX  25
 
 constexpr uint8_t CALLBACK_FOR_ALL_OPCODES=0xFF;
+
+#define LOCONET_PACKET_SIZE(command, size) \
+    ((command & 0x60 ) == 0x60 ) ? size : ((command & 0x60 ) >> 4) + 2
 
 class LocoNet {
     public:
@@ -478,6 +481,9 @@ class LocoNetSystemVariable {
         void onSVChange(std::function<void(uint16_t, uint8_t, uint8_t)> callback) {
             _svChangeCallback = callback;
         }
+        void reconfigureCallback(std::function<void()> callback) {
+            _reconfigureCallback = callback;
+        }
     private:
         LocoNet &_locoNet;
         uint8_t _mfgId;
@@ -487,6 +493,7 @@ class LocoNetSystemVariable {
         bool _deferredProcessingRequired;
         uint8_t _deferredSrcAddr;
         std::function<void(uint16_t, uint8_t, uint8_t)> _svChangeCallback;
+        std::function<void()> _reconfigureCallback;
 
 
         /** Read a value from the given EEPROM offset.

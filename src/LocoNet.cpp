@@ -98,12 +98,17 @@ LN_STATUS LocoNet::send(lnMsg *pPacket, uint8_t ucPrioDelay) {
   LN_STATUS enReturn;
   bool ucWaitForEnterBackoff;
 
+  /* clip maximum prio delay */
+  if(ucPrioDelay > LN_BACKOFF_MAX) {
+      ucPrioDelay = LN_BACKOFF_MAX;
+  }
+
   /* First calculate the checksum as it may not have been done */
   uint8_t *packet = reinterpret_cast<uint8_t *>(pPacket);
-  uint8_t packetLen = ((pPacket->sz.command & 0x60) == 0x60) ? pPacket->sz.mesg_size : ((pPacket->sz.command & 0x60) >> 4) + 2;
+  uint8_t packetLen = LOCONET_PACKET_SIZE(pPacket->sz.command, pPacket->sz.mesg_size);
   uint8_t packetChecksum = 0xFF;
-  for(uint8_t lnTxIndex = 0; lnTxIndex < packetLen - 1; lnTxIndex++) {
-    packetChecksum ^= packet[lnTxIndex];
+  for(uint8_t index = 0; index < packetLen - 1; index++) {
+    packetChecksum ^= packet[index];
   }
   packet[packetLen - 1] = packetChecksum;
 

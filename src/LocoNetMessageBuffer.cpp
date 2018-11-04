@@ -55,6 +55,7 @@
  *
  *****************************************************************************/
 
+#include "LocoNet.h"
 #include "LocoNetMessageBuffer.h"
 
 #define		LN_CHECKSUM_SEED        (uint8_t)0xFF
@@ -71,13 +72,13 @@ LocoNetMessageBuffer::LocoNetMessageBuffer() {
 }
 
 lnMsg *LocoNetMessageBuffer::getMsg() {
-	if( index < 2) {
+	if(index < 2) {
 		return nullptr;
 	}
 
 	if(!expLen) {
-			// If it's a fixed length packet, compute the length from the OPC_Code, else get the length from the byte 1
-		expLen = ( ( buffer[0] & (uint8_t)0x60 ) == (uint8_t)0x60 ) ? buffer[1] : ( ( buffer[0] & (uint8_t)0x60 ) >> (uint8_t)4 ) + (uint8_t)2 ;
+		// If it's a fixed length packet, compute the length from the OPC_Code, else get the length from the byte 1
+		expLen = LOCONET_PACKET_SIZE(buffer[0], buffer[1]);
 	}
 
 	if(expLen == index) {
@@ -90,10 +91,6 @@ lnMsg *LocoNetMessageBuffer::getMsg() {
 	}
 
 	return nullptr;
-}
-
-uint8_t LocoNetMessageBuffer::getMsgSize(volatile lnMsg * Msg) {
-	return ((Msg->sz.command & 0x60 ) == 0x60 ) ? Msg->sz.mesg_size : ((Msg->sz.command & 0x60 ) >> 4) + 2;
 }
 
 lnMsg *LocoNetMessageBuffer::addByte(uint8_t newByte) {

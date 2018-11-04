@@ -40,13 +40,6 @@
 #include <esp32-hal-timer.h>
 #include <deque>
 
-#define RX_BUFFER_SIZE	64
-#define LN_ST_IDLE            0   // net is free for anyone to start transmission
-#define LN_ST_CD_BACKOFF      1   // timer interrupt is counting backoff bits
-#define LN_ST_TX_COLLISION    2   // just sending break after creating a collision
-#define LN_ST_TX              3   // transmitting a packet
-#define LN_ST_RX              4   // receiving bytes
-
 #define LN_COLLISION_TICKS 15
 #define LN_TX_RETRIES_MAX  25
 
@@ -60,15 +53,21 @@ class LocoNetESP32: public LocoNet
         LN_STATUS sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay);
         void IRAM_ATTR loconetStartBit();
         void IRAM_ATTR loconetBitTimer();
-        void TaskRun();
     private:
+        typedef enum {
+            LN_ST_IDLE = 0,     // net is free for anyone to start transmission
+            LN_ST_CD_BACKOFF,   // timer interrupt is counting backoff bits
+            LN_ST_TX_COLLISION, // just sending break after creating a collision
+            LN_ST_TX,           // transmitting a packet
+            LN_ST_RX            // receiving bytes
+        } LN_TX_RX_STATUS;
+
         std::deque<uint8_t> _txBuffer;
         uint8_t _lnCurrentTxByte;
-
-        volatile uint8_t _lnState;
+        LN_TX_RX_STATUS _state;
         portMUX_TYPE _timerMux = portMUX_INITIALIZER_UNLOCKED;
-        volatile uint8_t _lnCurrentRxByte;
-        volatile uint8_t _lnBitCount;
+        uint8_t _lnCurrentRxByte;
+        uint8_t _currentBit;
         TaskHandle_t _processingTask;
         hw_timer_t * _lnTimer;
 
@@ -83,5 +82,5 @@ class LocoNetESP32: public LocoNet
             LOCONET_RX_LOW=LOW,
             LOCONET_RX_HIGH=HIGH
         };
-        bool CheckCollision();
+
 };
