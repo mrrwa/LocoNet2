@@ -84,7 +84,7 @@ void LocoNetESP32Uart::rxtxTask() {
 					_state = TX;
 					while(uxQueueMessagesWaiting(_txQueue) > 0 && _state == TX) {
 						uint8_t out;
-						if(xQueueAltReceive(_txQueue, &out, (portTickType)1)) {
+						if(xQueueReceive(_txQueue, &out, (portTickType)1)) {
 							// collision check between each byte
 							if(digitalRead(_rxPin) == !_inverted ? LOW : HIGH) {
 								startCollisionTimer();
@@ -127,7 +127,7 @@ LN_STATUS LocoNetESP32Uart::sendLocoNetPacketTry(uint8_t *packetData, uint8_t pa
 	}
 	if(_txQueue) {
 		for(uint8_t index = 0; index < packetLen && (_state == IDLE || _state == TX); index++) {
-			while(xQueueAltSendToBack(_txQueue, &packetData[index], (portTickType)5) != pdPASS) {
+			while(xQueueSendToBack(_txQueue, &packetData[index], (portTickType)5) != pdPASS) {
 				vPortYield();
 			}
 		}
