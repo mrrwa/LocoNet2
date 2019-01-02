@@ -337,11 +337,12 @@ constexpr uint8_t DEC_MODE_28    = 0;
 #define CVH_D7              0x02    /* MSbit for data value         */
 
 /* build data byte from programmer message */
-#define PROG_DATA(ptr)      (((ptr->cvh & CVH_D7) << 6) | (ptr->data7 & 0x7f))
+#define PROG_DATA(progTaskMsg)      (((progTaskMsg.cvh & CVH_D7) << 6) | (progTaskMsg.data7 & 0x7f))
 
 /* build CV # from programmer message */
-#define PROG_CV_NUM(ptr)    (((((ptr->cvh & CVH_CV8_CV9) >> 3) | (ptr->cvh & CVH_CV7)) * 128)   \
-                            + (ptr->cvl & 0x7f))
+#define PROG_CV_NUM(progTaskMsg)    (((((progTaskMsg.cvh & CVH_CV8_CV9) >> 3) | \
+                                    (progTaskMsg.cvh & CVH_CV7)) * 128) \
+                                    + (progTaskMsg.cvl & 0x7f))
 
 typedef struct
 {
