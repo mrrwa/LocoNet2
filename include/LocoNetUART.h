@@ -56,7 +56,7 @@ class LocoNetUart: public LocoNet {
 	protected:
 		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
 	public:
-		virtual void begin();
+		virtual bool begin();
 };
 
 #endif

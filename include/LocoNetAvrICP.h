@@ -43,7 +43,7 @@ class LocoNetAvrIcp: public LocoNet
 {
 	public:
 		LocoNetAvrIcp(uint8_t txPin);
-		virtual void begin();
+		virtual bool begin();
 		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
 };
 

@@ -21,7 +21,7 @@ LocoNetESP32::LocoNetESP32(uint8_t rxPin, uint8_t txPin, uint8_t timerId) : Loco
     locoNetInstance = this;
 }
 
-void LocoNetESP32::begin() {
+bool LocoNetESP32::begin() {
     /* Use one of the four ESP32 hardware timers.
      * Set divider for prescaler (see ESP32 Technical Reference Manual for more
      * info) This  should give 10 ticks per bit period for a 16.66kbps link.
@@ -45,6 +45,7 @@ void LocoNetESP32::begin() {
     /* attach the startbit interrup to the rx pin */
     DEBUG("Attaching ISR for RX pin %d", _rxPin);
     attachInterrupt(digitalPinToInterrupt(_rxPin), locoNetStartBitCallback, FALLING);
+    return true;
 }
 
 void LocoNetESP32::end() {

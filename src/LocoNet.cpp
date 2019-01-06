@@ -80,7 +80,8 @@ const char * LoconetStatusStrings[] = {
 LocoNet::LocoNet() {
 }
 
-void LocoNet::begin() {
+bool LocoNet::begin() {
+  return true;
 }
 
 void LocoNet::end() {

@@ -130,7 +130,7 @@ constexpr uint8_t CALLBACK_FOR_ALL_OPCODES=0xFF;
 class LocoNet {
     public:
         LocoNet();
-        virtual void begin();
+        virtual bool begin();
         virtual void end();
         LN_STATUS send(lnMsg *TxPacket);
         LN_STATUS send(lnMsg *TxPacket, uint8_t PrioDelay);

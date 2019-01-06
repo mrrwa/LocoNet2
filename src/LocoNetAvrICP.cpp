@@ -37,11 +37,11 @@
 #include "LocoNetAvrICP.h"
 #ifndef ESP32
 
-void LocoNetAvrIcpClass::begin(uint8_t txPin)
+bool LocoNetAvrIcp::begin(uint8_t txPin)
 {
 }
 
-LN_STATUS LocoNetAvrIcpClass::sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay)
+LN_STATUS LocoNetAvrIcp::sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay)
 {
 	txData = txData;						// Keep the Compilar happy
 	ucPrioDelay = ucPrioDelay;

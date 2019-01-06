@@ -40,11 +40,12 @@
 #include <esp32-hal-gpio.h>
 #include <esp32-hal-uart.h>
 #include <freertos/queue.h>
+#include <freertos/semphr.h>
 
 class LocoNetESP32Uart: public LocoNet {
 	public:
-		LocoNetESP32Uart(uint8_t rxPin=16, uint8_t txPin=15, uint8_t uartNum=1, bool inverted=false);
-		virtual void begin();
+		LocoNetESP32Uart(uint8_t rxPin=16, uint8_t txPin=15, uint8_t uartNum=1, bool inverted=false, const BaseType_t preferedCore=tskNO_AFFINITY);
+		virtual bool begin();
 		virtual void end();
 		static void taskEntryPoint(void *param) {
 			static_cast<LocoNetESP32Uart *>(param)->rxtxTask();
@@ -66,11 +67,13 @@ class LocoNetESP32Uart: public LocoNet {
 		} LN_TX_RX_STATUS;
 		const uint8_t _rxPin, _txPin;
 		const bool _inverted;
+		const BaseType_t _preferedCore;
 		uart_t *_uart;
 		LN_TX_RX_STATUS _state;
 		TaskHandle_t _rxtxTask;
 		uint64_t _cdBackoffStart;
 		uint64_t _cdBackoffTimeout;
 		uint64_t _collisionTimeout;
-		xQueueHandle _txQueue;
+		QueueHandle_t _txQueue;
+		SemaphoreHandle_t _txQueuelock;
 };

@@ -47,7 +47,7 @@ class LocoNetESP32: public LocoNet
 {
     public:
         LocoNetESP32(uint8_t rxPin=16, uint8_t txPin=15, uint8_t timerId=0);
-        virtual void begin();
+        virtual bool begin();
         virtual void end();
 
         LN_STATUS sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay);
