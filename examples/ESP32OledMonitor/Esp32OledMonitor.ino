@@ -11,10 +11,10 @@
 // function and examples of each of the notifyXXXXXXX user call-back functions
 #include <stdio.h>
 #include <Arduino.h>
-#include <LocoNetESP32.h>
+#include <LocoNetESP32UART.h>
 #include <SSD1306.h>
 
-LocoNetESP32 LocoNet;
+LocoNetESP32Uart locoNet;
 SSD1306 display(0x3c, 5, 4);
 #define BUF_SIZE (1024)
 
@@ -28,8 +28,8 @@ void setup()
 
     // First initialize the LocoNet interface
 
-    LocoNet.init();
-    LocoNet.onPacket(CALLBACK_FOR_ALL_OPCODES, [](lnMsg *rxPacket) {
+    locoNet.begin();
+    locoNet.onPacket(CALLBACK_FOR_ALL_OPCODES, [](lnMsg *rxPacket) {
         Serial.print("rx'd ");
         for(uint8_t x = 0; x < 4; x++) {
             uint8_t val = rxPacket->data[x];
@@ -43,7 +43,7 @@ void setup()
         }
         Serial.print("\r\n");
     });
-    LocoNet.onSwitchRequest([](uint16_t address, bool output, bool direction) {
+    locoNet.onSwitchRequest([](uint16_t address, bool output, bool direction) {
         display.clear();
         display.setTextAlignment(TEXT_ALIGN_LEFT);
         display.drawString(0, 0, "Switch Request: ");
@@ -58,22 +58,22 @@ void setup()
         Serial.print(" - ");
         Serial.println(output ? "On" : "Off");
     });
-    LocoNet.onSwitchReport([](uint16_t address, bool state, bool sensor) {
+    locoNet.onSwitchReport([](uint16_t address, bool state, bool sensor) {
         display.clear();
         display.setTextAlignment(TEXT_ALIGN_LEFT);
-        display.drawString(0, 0, "Switch Sensor Report: ");
+        display.drawString(0, 0, "Switch/Sensor Report: ");
         display.drawString(0, 20, String(address) + sensor ? ":Switch" : ":Aux");
         display.drawString(0, 40, state ? "Active" : "Inactive");
         display.display();
 
-        Serial.print("Switch Sensor Report: ");
+        Serial.print("Switch/Sensor Report: ");
         Serial.print(address, DEC);
         Serial.print(':');
         Serial.print(sensor ? "Switch" : "Aux");
         Serial.print(" - ");
         Serial.println(state ? "Active" : "Inactive");
     });
-    LocoNet.onSensorChange([](uint16_t address, bool state) {
+    locoNet.onSensorChange([](uint16_t address, bool state) {
         display.clear();
         display.setTextAlignment(TEXT_ALIGN_LEFT);
         display.drawString(0, 0, "Sensor: ");

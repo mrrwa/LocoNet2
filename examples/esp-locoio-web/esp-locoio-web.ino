@@ -102,9 +102,7 @@ You will then also need to update NUM_PINS as well.
 */
 
 
-#include <LocoNetAvrICP.h>
-#include <LocoNetUART.h>
-#include <LocoNetESP32.h>
+#include <LocoNetESP32UART.h>
 
 #include <WiFi.h>
 #include <FS.h>
@@ -121,7 +119,6 @@ You will then also need to update NUM_PINS as well.
 #define DEBOUNCE_TIME 20
 
 AsyncWebServer server ( 80 );
-
 
 typedef enum PIN_STATE
 {
@@ -176,7 +173,7 @@ typedef struct PIN_CONFIG_STRUCT
 PinConfigStruct PinConfig[NUM_PINS];
 
 File configFile;
-LocoNetESP32Class LocoNet;
+LocoNetESP32Uart locoNet;
 
 void setup()
 {
@@ -190,8 +187,66 @@ void setup()
 
     ConfigureWebserver();
 
-    LocoNet.init();
+    locoNet.begin();
 
+    locoNet.onSwitchRequest([](uint16_t address, bool output, bool direction)
+    {
+#ifdef VERBOSE
+        Serial.print("Switch Request: ");
+        Serial.print(address, DEC);
+        Serial.print(':');
+        Serial.print(direction ? "Closed" : "Thrown");
+        Serial.print(" - ");
+        Serial.println(output ? "On" : "Off");
+#endif
+        for(int Idx = 0; Idx < NUM_PINS; Idx++)
+        {
+            if(PinConfig[Idx].address == address && !PinConfig[Idx].typeInput)
+            {
+                /* Pulsed outputs only look at the "output"*/
+                if(PinConfig[Idx].OutputCfg.outputPulse)
+                {
+                    /* check if the direction matches what is expected for the contact number */
+                    if(PinConfig[Idx].contact1 == direction && output)
+                    {
+                        digitalWrite(PinConfig[Idx].pin, HIGH);
+                        delay(PinConfig[Idx].OutputCfg.outputPulseLen);
+                        digitalWrite(PinConfig[Idx].pin, LOW);
+                    }
+                }
+                else if(PinConfig[Idx].OutputCfg.blockDetctor)
+                {
+                    digitalWrite(PinConfig[Idx].pin, output);
+                }
+                else
+                {
+                    digitalWrite(PinConfig[Idx].pin, direction);
+                }
+            }
+        }
+    });
+
+
+#ifdef VERBOSE
+    locoNet.onSwitchReport([](uint16_t address, bool state, bool sensor)
+    {
+        Serial.print("Switch/Sensor Report: ");
+        Serial.print(address, DEC);
+        Serial.print(':');
+        Serial.print(sensor ? "Switch" : "Aux");
+        Serial.print(" - ");
+        Serial.println(state ? "Active" : "Inactive");
+    });
+    locoNet.onSwitchState([](uint16_t address, bool output, bool direction)
+    {
+        Serial.print("Switch State: ");
+        Serial.print(address, DEC);
+        Serial.print(':');
+        Serial.print(direction ? "Closed" : "Thrown");
+        Serial.print(" - ");
+        Serial.println(output ? "On" : "Off");
+    });
+#endif
 }
 
 /* This does the main input and output functions accoarding
@@ -201,7 +256,7 @@ void setup()
 void loop()
 {
   /* delay so as to give the other tasks time to do something*/
-    delay(1);
+    delay(2);
     for(int Idx = 0; Idx < NUM_PINS; Idx++)
     {
         if(PinConfig[Idx].typeInput == true)
@@ -217,14 +272,14 @@ void loop()
             }
             else if (PinConfig[Idx].sendState = STATE_CHANGING)
             {
-                if((PinConfig[Idx].InputCfg.switchOffDelay == true) && (currPinState != Active))
+                if(PinConfig[Idx].InputCfg.switchOffDelay && (currPinState != Active))
                 {
                     if ((millis() - PinConfig[Idx].lastChangeTime) > PinConfig[Idx].InputCfg.switchOffDelayLen)
                     {
                         PinConfig[Idx].sendState = INPUT_OFF;
                     }
                 }
-                else if((PinConfig[Idx].InputCfg.switchOnDelay == true) && (currPinState == Active))
+                else if(PinConfig[Idx].InputCfg.switchOnDelay && (currPinState == Active))
                 {
                     if ((millis() - PinConfig[Idx].lastChangeTime) >= PinConfig[Idx].InputCfg.switchOnDelayLen)
                     {
@@ -260,15 +315,13 @@ void loop()
             }
 
             /* Work out if it is now time to turn a pulsed input off */
-            if(PinConfig[Idx].InputCfg.inputPulse == true)
+            if(PinConfig[Idx].InputCfg.inputPulse)
             {
-                if((PinConfig[Idx].sendState == PULSE_ON_SENT) && (millis() >= PinConfig[Idx].pulseEndAtTime))
+                if(PinConfig[Idx].sendState == PULSE_ON_SENT && millis() >= PinConfig[Idx].pulseEndAtTime)
                 {
                     PinConfig[Idx].sendState = PULSE_OFF;
                 }
             }
-
-
 
             if(PinConfig[Idx].sendState > STATE_CHANGING)
             {
@@ -278,12 +331,11 @@ void loop()
                 {
                     msg.srp.command = OPC_SW_REP;
                     msg.srp.sn1 = PinConfig[Idx].address & LOWER_4K_ADDR_MASK;
-                    msg.srp.sn1 = (PinConfig[Idx].address >> UPPER_4K_ADDR_SHIFT) & UPPER_4K_ADDR_MASK;
-                    msg.srp.sn1 |= OPC_INPUT_REP_CB | OPC_INPUT_REP_SW;
-
+                    msg.srp.sn2 = (PinConfig[Idx].address >> UPPER_4K_ADDR_SHIFT) & UPPER_4K_ADDR_MASK;
+                    msg.srp.sn2 |= OPC_INPUT_REP_CB | OPC_INPUT_REP_SW;
                     if(PinConfig[Idx].sendState == INPUT_ON)
                     {
-                          msg.srp.sn1 |= OPC_SW_REP_THROWN;
+                        msg.srp.sn2 |= OPC_SW_REP_THROWN;
                     }
                 }
                 else
@@ -292,17 +344,15 @@ void loop()
                     msg.ir.in1 = PinConfig[Idx].address & LOWER_4K_ADDR_MASK;
                     msg.ir.in2 = (PinConfig[Idx].address >> UPPER_4K_ADDR_SHIFT) & UPPER_4K_ADDR_MASK;
                     msg.ir.in2 |= OPC_INPUT_REP_CB | OPC_INPUT_REP_SW;
-
                     if(PinConfig[Idx].sendState == INPUT_ON)
                     {
                         msg.ir.in2 |= OPC_INPUT_REP_HI;
                     }
                 }
                 /* Send the input response. */
-                LocoNet.send(&msg, 8);
+                locoNet.send(&msg, 8);
 
-                if((PinConfig[Idx].InputCfg.inputPulse == true) &&
-                    (PinConfig[Idx].sendState == INPUT_ON))
+                if(PinConfig[Idx].InputCfg.inputPulse && PinConfig[Idx].sendState == INPUT_ON)
                 {
                   PinConfig[Idx].sendState = PULSE_ON_SENT;
                 }
@@ -515,87 +565,4 @@ void SpinOnException(void)
     {
         delay(1);
     }
-}
-
-
-void notifySwitchRequest(uint16_t Address, uint8_t Output, uint8_t Direction)
-{
-#ifdef VERBOSE
-    Serial.print("Switch Request: ");
-    Serial.print(Address, DEC);
-    Serial.print(':');
-    Serial.print(Direction ? "Closed" : "Thrown");
-    Serial.print(" - ");
-    Serial.println(Output ? "On" : "Off");
-#endif
-
-    for(int Idx = 0; Idx < NUM_PINS; Idx++)
-    {
-        if((PinConfig[Idx].address == Address) && (!PinConfig[Idx].typeInput))
-        {
-            /* Pulsed outputs only look at the "ouput"*/
-            if(PinConfig[Idx].OutputCfg.outputPulse)
-            {
-              /* check if the direction matches what is expected for the contact number */
-                if((PinConfig[Idx].contact1  && (Direction != 0) && (Output != 0)) ||
-                   (!PinConfig[Idx].contact1 && (Direction  == 0) && (Output != 0)))
-                   {
-                      digitalWrite(PinConfig[Idx].pin, HIGH);
-                      delay(PinConfig[Idx].OutputCfg.outputPulseLen);
-                      digitalWrite(PinConfig[Idx].pin, LOW);
-                   }
-
-            }
-            else if(PinConfig[Idx].OutputCfg.blockDetctor)
-            {
-                if(Output != 0)
-                {
-                  digitalWrite(PinConfig[Idx].pin, HIGH);
-                }
-                else
-                {
-                  digitalWrite(PinConfig[Idx].pin, LOW);
-                }
-            }
-            else
-            {
-              if(Direction != 0)
-              {
-                digitalWrite(PinConfig[Idx].pin, HIGH);
-              }
-              else
-              {
-                digitalWrite(PinConfig[Idx].pin, LOW);
-              }
-            }
-        }
-    }
-}
-
-  // This call-back function is called from LocoNet.processSwitchSensorMessage
-  // for all Switch Report messages
-void notifySwitchReport( uint16_t Address, uint8_t Output, uint8_t Direction )
-{
-  #ifdef VERBOSE
-  Serial.print("Switch Report: ");
-  Serial.print(Address, DEC);
-  Serial.print(':');
-  Serial.print(Direction ? "Closed" : "Thrown");
-  Serial.print(" - ");
-  Serial.println(Output ? "On" : "Off");
-  #endif
-}
-
-  // This call-back function is called from LocoNet.processSwitchSensorMessage
-  // for all Switch State messages
-void notifySwitchState( uint16_t Address, uint8_t Output, uint8_t Direction )
-{
-  #ifdef VERBOSE
-  Serial.print("Switch State: ");
-  Serial.print(Address, DEC);
-  Serial.print(':');
-  Serial.print(Direction ? "Closed" : "Thrown");
-  Serial.print(" - ");
-  Serial.println(Output ? "On" : "Off");
-  #endif
 }
