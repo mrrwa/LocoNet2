@@ -175,6 +175,14 @@ PinConfigStruct PinConfig[NUM_PINS];
 File configFile;
 LocoNetESP32Uart locoNet;
 
+void ConfigureWifi(void);
+void ConfigureSPIFFS(void);
+void ConfigureLocoGPIO(void);
+void ConfigureWebserver(void);
+
+void ProcessData(uint8_t *data, size_t len, size_t index, size_t total);
+void SpinOnException(void);
+
 void setup()
 {
     Serial.begin(115200);
@@ -365,7 +373,6 @@ void loop()
     }
 }
 
-
 /* Configure Wifi */
 void ConfigureWifi(void)
 {
@@ -520,7 +527,6 @@ void ConfigureWebserver(void)
     Serial.println ( "HTTP server started" );
 }
 
-
 void ProcessData(uint8_t *data, size_t len, size_t index, size_t total)
 {
     if (!configFile)
@@ -557,7 +563,6 @@ void ProcessData(uint8_t *data, size_t len, size_t index, size_t total)
         ConfigureLocoGPIO();
     }
 }
-
 
 void SpinOnException(void)
 {
