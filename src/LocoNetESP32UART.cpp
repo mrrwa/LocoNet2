@@ -1,7 +1,5 @@
 #include "LocoNetESP32UART.h"
 #include <esp_task_wdt.h>
-#include <rom/uart.h>
-#include <soc/uart_reg.h>
 #include <soc/uart_struct.h>
 
 constexpr UBaseType_t LocoNetRXTXThreadPriority = 2;
