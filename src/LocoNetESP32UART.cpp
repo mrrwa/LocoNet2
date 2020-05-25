@@ -1,6 +1,5 @@
 #include "LocoNetESP32UART.h"
 #include <esp_task_wdt.h>
-#include <soc/uart_struct.h>
 
 constexpr UBaseType_t LocoNetRXTXThreadPriority = 2;
 constexpr uint32_t LocoNetRXTXThreadStackSize = 1600;
@@ -17,25 +16,34 @@ constexpr uint32_t CDBackoffTimeoutIncrement = LocoNetTickTime * LN_CARRIER_TICK
 #define LOCONET_TX_LOCK()    do {} while (xSemaphoreTake(_txQueuelock, portMAX_DELAY) != pdPASS)
 #define LOCONET_TX_UNLOCK()  xSemaphoreGive(_txQueuelock)
 
-// declare the full struct as it is not exported from esp32-hal-uart.c
-struct uart_struct_t {
-    uart_dev_t * dev;
-#if !CONFIG_DISABLE_HAL_LOCKS
-    xSemaphoreHandle lock;
-#endif
-    uint8_t num;
-    xQueueHandle queue;
-    intr_handle_t intr_handle;
-};
 
-LocoNetESP32Uart::LocoNetESP32Uart(uint8_t rxPin, uint8_t txPin, uint8_t uartNum, bool inverted, bool enablePullup, const BaseType_t preferedCore) :
-	LocoNet(), _rxPin(rxPin), _txPin(txPin), _inverted(inverted), _preferedCore(preferedCore), _state(IDLE) {
+
+extern "C" void uartDetachRx(uart_t* uart);
+extern "C" void uartDetachTx(uart_t* uart);
+extern "C" void uartAttachRx(uart_t* uart, uint8_t rxPin, bool inverted);
+extern "C" void uartAttachTx(uart_t* uart, uint8_t txPin, bool inverted);
+
+LocoNetESP32Uart::LocoNetESP32Uart(uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 
+		bool invertedRx, bool invertedTx, bool enablePullup, const BaseType_t preferedCore
+		) :
+	LocoNet(), _rxPin(rxPin), _txPin(txPin), _invertedRx(invertedRx), _invertedTx(invertedTx), 
+	_preferedCore(preferedCore), _state(IDLE) 
+{
 	DEBUG("Initializing UART(%d) with RX:%d, TX:%d", uartNum, _rxPin, _txPin);
-	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, _txPin, 256, _inverted);
+	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, _txPin, 256, false);
+	if(_invertedRx) {		
+		uartDetachRx(_uart);
+		uartAttachRx(_uart, _rxPin, true);
+	}
+	if(_invertedTx) {
+		uartDetachTx(_uart);
+		uartAttachTx(_uart, _txPin, true);
+	}
+
 	_rxtxTask = nullptr;
 	// note: this needs to be done after uartBegin which will set the pin mode to INPUT only.
 	if(enablePullup) {
-		pinMode(_rxPin, INPUT_PULLUP);
+		pinMode(_rxPin, invertedRx ? INPUT_PULLDOWN : INPUT_PULLUP);
 	}
 }
 
@@ -132,9 +140,9 @@ void LocoNetESP32Uart::rxtxTask() {
 				// st_urx_out contains the status of the UART RX state machine,
 				// any value other than zero indicates it is active.
 				if(uartRxActive(_uart) ||
-					digitalRead(_rxPin) == !_inverted ? LOW : HIGH) {
+					digitalRead(_rxPin) == !_invertedRx ? LOW : HIGH) {
 					startCollisionTimer();
-				} else {
+				} else  {
 					// no collision, start TX
 					_state = TX;
 					while(uxQueueMessagesWaiting(_txQueue) > 0 && _state == TX) {
@@ -167,11 +175,11 @@ void LocoNetESP32Uart::rxtxTask() {
 			}
 			LOCONET_TX_UNLOCK();
 		} else if(_state == TX_COLLISION && checkCollisionTimer()) {
-			digitalWrite(_txPin, !_inverted ? LOW : HIGH);
+			digitalWrite(_txPin, !_invertedTx ? LOW : HIGH);
 			startCDBackoffTimer();
 			DEBUG("TX COLLISION TIMER");
 		} else {
-			digitalWrite(_txPin, _inverted ? LOW : HIGH);
+			digitalWrite(_txPin, _invertedTx ? LOW : HIGH);
 		}
 		esp_task_wdt_reset();
 		delay(1);
