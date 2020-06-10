@@ -38,10 +38,8 @@
 
 #include "LocoNet.h"
 #include <esp32-hal-timer.h>
-#include <deque>
 
-#define LN_COLLISION_TICKS 15
-#define LN_TX_RETRIES_MAX  25
+
 
 class LocoNetESP32: public LocoNet
 {
@@ -51,8 +49,6 @@ class LocoNetESP32: public LocoNet
         virtual void end();
 
         LN_STATUS sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay);
-        void IRAM_ATTR loconetStartBit();
-        void IRAM_ATTR loconetBitTimer();
     private:
         typedef enum {
             LN_ST_IDLE = 0,     // net is free for anyone to start transmission
@@ -62,25 +58,44 @@ class LocoNetESP32: public LocoNet
             LN_ST_RX            // receiving bytes
         } LN_TX_RX_STATUS;
 
-        std::deque<uint8_t> _txBuffer;
-        uint8_t _lnCurrentTxByte;
+        QueueHandle_t _rxQueue;
+        QueueHandle_t _txQueue;
         LN_TX_RX_STATUS _state;
         portMUX_TYPE _timerMux = portMUX_INITIALIZER_UNLOCKED;
+        uint8_t _lnCurrentTxByte;
         uint8_t _lnCurrentRxByte;
         uint8_t _currentBit;
-        TaskHandle_t _processingTask;
+        TaskHandle_t _rxByteTask;
         hw_timer_t * _lnTimer;
 
         const uint8_t _rxPin;
         const uint8_t _txPin;
         const uint8_t _timerId;
         enum {
-            LOCONET_TX_LOW=LOW,
-            LOCONET_TX_HIGH=HIGH
+            LOCONET_TX_LOW=HIGH,
+            LOCONET_TX_HIGH=LOW
         };
         enum {
             LOCONET_RX_LOW=LOW,
             LOCONET_RX_HIGH=HIGH
         };
+
+        bool _isrAttached;
+        void IRAM_ATTR enableStartBitISR(bool en=true) ;
+        void IRAM_ATTR loconetStartBit();
+        void IRAM_ATTR loconetBitTimer();
+
+        bool IRAM_ATTR checkCollision();
+        typedef enum {NO_LOCK, LOCK, LOCK_FROM_ISR} Lock;
+        void IRAM_ATTR changeState(LN_TX_RX_STATUS newStat, Lock ll=LOCK, uint8_t bit=0);
+
+        void rxByte();
+
+        static void rxByteProc(void* pvParams) {
+            ((LocoNetESP32*)pvParams)->rxByte();
+        }
+
+        friend void locoNetTimerCallback();
+        friend void locoNetStartBitCallback();
 
 };
