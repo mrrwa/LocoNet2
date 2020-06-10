@@ -113,20 +113,22 @@ LN_STATUS LocoNet::send(lnMsg *pPacket, uint8_t ucPrioDelay) {
   }
   packet[packetLen - 1] = packetChecksum;
 
-  DEBUG("LoconetPacket %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x",
-    pPacket->data[0], pPacket->data[1], pPacket->data[2], pPacket->data[3],
-    pPacket->data[4], pPacket->data[5], pPacket->data[6], pPacket->data[7],
-    pPacket->data[8], pPacket->data[9], pPacket->data[10], pPacket->data[11],
-    pPacket->data[12], pPacket->data[13], pPacket->data[14], pPacket->data[15]);
-
+#ifdef DEBUG_OUTPUT
+  char _msg[100] = "LoconetPacket";
+  int _l = strlen(_msg);
+  for(uint8_t i=0; i<packetLen; i++)
+    _l += sprintf(_msg+_l, " %02x", pPacket->data[i]);  
+  DEBUG(_msg);
+#endif
+  
   for (uint8_t ucTry = 0; ucTry < LN_TX_RETRIES_MAX; ucTry++) {
     // wait previous traffic and than prio delay and than try tx
     // don't want to abort do/while loop before we did not see the backoff state once
     ucWaitForEnterBackoff = true;
     do {
-      DEBUG("calling sendLocoNetPacketTry(%p, %d, %d)", packet, packetLen, ucPrioDelay);
+      DEBUG("calling sendLocoNetPacketTry(%p, %d, %d) attempt %d", packet, packetLen, ucPrioDelay, ucTry);
       enReturn = sendLocoNetPacketTry(packet, packetLen, ucPrioDelay);
-      DEBUG("sendLocoNetPacketTry returned %d", enReturn);
+      DEBUG("sendLocoNetPacketTry returned %s", enReturn==LN_CD_BACKOFF?"LN_CD_BACKOFF" : enReturn==LN_PRIO_BACKOFF?"LN_PRIO_BACKOFF" : enReturn==LN_NETWORK_BUSY?"LN_NETWORK_BUSY": enReturn==LN_DONE?"LN_DONE": enReturn==LN_COLLISION?"LN_COLLISION": enReturn==LN_UNKNOWN_ERROR?"LN_UNKNOWN_ERROR":"LN_RETRY_ERROR"); 
       if (enReturn == LN_DONE) { // success?
         return LN_DONE;
       }
@@ -196,17 +198,17 @@ void LocoNet::consume(uint8_t newByte) {
 
 	if (rxPacket) {
     if(callbacks.find(CALLBACK_FOR_ALL_OPCODES) != callbacks.end()) {
-      for(auto cb : callbacks[CALLBACK_FOR_ALL_OPCODES]) {
+      for(const auto &cb : callbacks[CALLBACK_FOR_ALL_OPCODES]) {
         cb(rxPacket);
       }
     }
     if(callbacks.find(rxPacket->sz.command) != callbacks.end()) {
-      for(auto cb : callbacks[rxPacket->sz.command]) {
+      for(const auto &cb : callbacks[rxPacket->sz.command]) {
         cb(rxPacket);
       }
 #if defined(DEBUG_OUTPUT)
     } else {
-      DEBUG("No callbacks for OpCode %d", rxPacket->sz.command);
+      DEBUG("No callbacks for OpCode %02x", rxPacket->sz.command);
 #endif
     }
 	}
@@ -319,5 +321,6 @@ LN_STATUS LocoNet::reportSensor( uint16_t Address, uint8_t State ) {
 
 void LocoNet::onPacket(uint8_t OpCode, std::function<void(lnMsg *)> callback) {
   callbacks[OpCode].push_back(callback);
-  DEBUG("registering callback function for OpCode: %d, %d callbacks for this OpCode.", OpCode, callbacks[OpCode].size());
+  DEBUG("registering callback function for OpCode: %02x, %d callbacks for this OpCode.", 
+    OpCode, callbacks[OpCode].size());
 }

@@ -99,6 +99,7 @@ constexpr uint8_t LN_INITIAL_PRIO_DELAY = 20; // initial attempt adds priority d
 constexpr uint8_t LN_BACKOFF_MIN        = (LN_CARRIER_TICKS + LN_MASTER_DELAY);      // not going below this
 constexpr uint8_t LN_BACKOFF_INITIAL    = (LN_BACKOFF_MIN + LN_INITIAL_PRIO_DELAY);  // for the first normal tx attempt
 constexpr uint8_t LN_BACKOFF_MAX        = (LN_BACKOFF_INITIAL + 10);                 // lower priority is not supported
+constexpr uint8_t LN_COLLISION_TICKS    = 15; //< after collision the bus will be low for this number of ticks.
 
 //
 // LNCV error codes
@@ -120,7 +121,7 @@ constexpr uint8_t LN_BACKOFF_MAX        = (LN_BACKOFF_INITIAL + 10);            
 #define LNCV_MIN_MODULEADDR (0)
 #define LNCV_MAX_MODULEADDR (65534)
 
-#define LN_TX_RETRIES_MAX  25
+#define LN_TX_RETRIES_MAX  1//25
 
 constexpr uint8_t CALLBACK_FOR_ALL_OPCODES=0xFF;
 

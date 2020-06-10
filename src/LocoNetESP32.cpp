@@ -15,6 +15,14 @@
 uint8_t debugPinVal=0;
 #endif
 
+#ifdef DEBUG_OUTPUT
+char _msg[1024];
+char _buf[100];
+#undef DEBUG_ISR
+#define DEBUG_ISR(...)  do{ snprintf(_buf, 100, __VA_ARGS__); snprintf(_msg, 1024, "%s%s\n", _msg, _buf ); } while(0)
+#define DEBUG_ISR_DUMP()  do{ Serial.print(_msg); _msg[0]=0; } while(0);
+#endif
+
 static LocoNetESP32 *locoNetInstance = nullptr;
 
 void IRAM_ATTR locoNetTimerCallback() {
@@ -272,7 +280,11 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
     case LN_ST_CD_BACKOFF: {
 
         if(_currentBit > LN_BACKOFF_MAX) {
-            changeState(LN_ST_IDLE, Lock::LOCK_FROM_ISR); //  DEBUG_ISR_DUMP();
+            changeState(LN_ST_IDLE, Lock::LOCK_FROM_ISR); 
+            #ifdef DEBUG_ISR_DUMP
+            // do slow printf after realtime stuff stops.
+            DEBUG_ISR_DUMP();
+            #endif
         } else {
             _currentBit++;
         }
