@@ -8,6 +8,8 @@
 
 #include <EEPROM.h>
 
+#define GPIO_DEBUG
+
 #ifdef GPIO_DEBUG
 #define DEBUG_IOPIN 14
 #define DEBUG_PIN_SB 12
@@ -51,8 +53,8 @@ bool LocoNetESP32::begin() {
     DEBUG("Configuring HW Timer %d as bit timer", _timerId);
     /* Use 1st timer of 4 (counted from zero).
      * Set divider for prescaler (see ESP32 Technical Reference Manual for more
-     * info) This  should give 10 ticks per bit period for a 16.66kbps link.
-     * Assuming clock frequency is 80Mhz, this will be 480    */
+     * info) This should give 10 ticks per bit period for a 16.66kbps link.
+     * Assuming clock frequency is 80Mhz, this will be 480.   */
     _lnTimer = timerBegin(_timerId, 480, true);
 
     /* Attach onTimer function to our timer. */
@@ -167,7 +169,7 @@ void IRAM_ATTR LocoNetESP32::loconetStartBit() {
 
     // make sure we sample the next bit
     timerStop(_lnTimer);
-    timerAlarmWrite(_lnTimer, 10, true); // we try to sample in the middle of bit, 1.5 bits from start bit edge
+    timerAlarmWrite(_lnTimer, 15, true); // we try to sample in the middle of bit, 1.5 bits from start bit edge
     changeState(LN_ST_RX, NO_LOCK);
 
     portEXIT_CRITICAL_ISR(&_timerMux);
