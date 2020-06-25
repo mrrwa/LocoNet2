@@ -125,10 +125,7 @@ constexpr uint8_t LN_COLLISION_TICKS    = 15; //< after collision the bus will b
 
 constexpr uint8_t CALLBACK_FOR_ALL_OPCODES=0xFF;
 
-#define LOCONET_PACKET_SIZE(command, size) \
-    ((command & 0x60 ) == 0x60 ) ? size : ((command & 0x60 ) >> 4) + 2
-
-inline uint8_t lnPacketSize(lnMsg * msg) {
+inline uint8_t lnPacketSize(const lnMsg * msg) {
     return LOCONET_PACKET_SIZE(msg->sz.command, msg->sz.mesg_size);
 }
 

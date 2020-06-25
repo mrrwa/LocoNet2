@@ -344,6 +344,9 @@ constexpr uint8_t DEC_MODE_28    = 0;
                                     (progTaskMsg.cvh & CVH_CV7)) * 128) \
                                     + (progTaskMsg.cvl & 0x7f))
 
+#define LOCONET_PACKET_SIZE(command, size) \
+    ((command & 0x60 ) == 0x60 ) ? size : ((command & 0x60 ) >> 4) + 2
+
 typedef struct
 {
   uint16_t rxPackets ;
@@ -679,7 +682,10 @@ typedef union {
 		multiSenseTranspMsg		mstr;
 		multiSenseDeviceInfoMsg	msdi;
 		uint8_t					data[16];
+        uint8_t length() const { return LOCONET_PACKET_SIZE(sz.command, sz.mesg_size); }
 } lnMsg ;
+
+#define LnMsg lnMsg;
 
 /* loconet opcodes */
 #define OPC_BUSY          0x81
