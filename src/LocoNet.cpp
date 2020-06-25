@@ -106,7 +106,7 @@ LN_STATUS LocoNet::send(lnMsg *pPacket, uint8_t ucPrioDelay) {
 
   /* First calculate the checksum as it may not have been done */
   uint8_t *packet = reinterpret_cast<uint8_t *>(pPacket);
-  uint8_t packetLen = LOCONET_PACKET_SIZE(pPacket->sz.command, pPacket->sz.mesg_size);
+  uint8_t packetLen = lnPacketSize(pPacket);
   uint8_t packetChecksum = 0xFF;
   for(uint8_t index = 0; index < packetLen - 1; index++) {
     packetChecksum ^= packet[index];
@@ -193,24 +193,33 @@ LN_STATUS LocoNet::reportPower(bool state) {
   return send( &SendPacket ) ;
 }
 
-void LocoNet::consume(uint8_t newByte) {
-	lnMsg * rxPacket = rxBuffer.addByte(newByte);
-
-	if (rxPacket) {
-    if(callbacks.find(CALLBACK_FOR_ALL_OPCODES) != callbacks.end()) {
-      for(const auto &cb : callbacks[CALLBACK_FOR_ALL_OPCODES]) {
-        cb(rxPacket);
-      }
-    }
-    if(callbacks.find(rxPacket->sz.command) != callbacks.end()) {
-      for(const auto &cb : callbacks[rxPacket->sz.command]) {
-        cb(rxPacket);
+void LocoNet::parsePacket(lnMsg *packet) {
+if(callbacks.find(packet->sz.command) != callbacks.end()) {
+      for(const auto &cb : callbacks[packet->sz.command]) {
+        cb(packet);
       }
 #if defined(DEBUG_OUTPUT)
     } else {
       DEBUG("No callbacks for OpCode %02x", rxPacket->sz.command);
 #endif
     }
+}
+
+void LocoNet::processPacket(lnMsg *packet) {
+    if(callbacks.find(CALLBACK_FOR_ALL_OPCODES) != callbacks.end()) {
+      for(const auto &cb : callbacks[CALLBACK_FOR_ALL_OPCODES]) {
+        cb(packet);
+      }
+    }
+    
+    parsePacket(packet);
+}
+
+void LocoNet::consume(uint8_t newByte) {
+	lnMsg * rxPacket = rxBuffer.addByte(newByte);
+
+	if (rxPacket) {
+    processPacket(rxPacket);
 	}
 }
 
@@ -323,4 +332,12 @@ void LocoNet::onPacket(uint8_t OpCode, std::function<void(lnMsg *)> callback) {
   callbacks[OpCode].push_back(callback);
   DEBUG("registering callback function for OpCode: %02x, %d callbacks for this OpCode.", 
     OpCode, callbacks[OpCode].size());
+}
+
+lnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack) {
+  lnMsg lack;
+  lack.lack.opcode = OPC_LONG_ACK;
+  lack.lack.command = replyToOpc;
+  lack.lack.ack1 = ack;
+  return lack;
 }

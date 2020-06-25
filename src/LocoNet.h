@@ -128,6 +128,14 @@ constexpr uint8_t CALLBACK_FOR_ALL_OPCODES=0xFF;
 #define LOCONET_PACKET_SIZE(command, size) \
     ((command & 0x60 ) == 0x60 ) ? size : ((command & 0x60 ) >> 4) + 2
 
+inline uint8_t lnPacketSize(lnMsg * msg) {
+    return LOCONET_PACKET_SIZE(msg->sz.command, msg->sz.mesg_size);
+}
+
+#define ADDR(hi,lo)  (   ((lo) | (((hi) & 0x0F ) << 7))    )
+
+lnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack);
+
 class LocoNet {
     public:
         LocoNet();
@@ -147,6 +155,9 @@ class LocoNet {
         LN_STATUS reportSwitch(uint16_t Address);
         LN_STATUS reportSensor(uint16_t Address, uint8_t State);
         LN_STATUS reportPower(bool state);
+
+        void parsePacket(lnMsg *packet);
+        void processPacket(lnMsg *packet);
 
         void onPacket(uint8_t OpCode, std::function<void(lnMsg *)> callback);
         /**
