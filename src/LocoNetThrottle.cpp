@@ -63,7 +63,7 @@
  *
  *****************************************************************************/
 
-#include "LocoNet.h"
+#include "LocoNetThrottle.h"
 
 LocoNetThrottle::LocoNetThrottle(LocoNet &locoNet, uint8_t userData, uint8_t options, uint16_t throttleId) :
   _locoNet(locoNet), _state(TH_ST_FREE), _ticksSinceLastAction(0), _throttleId(throttleId),
@@ -185,7 +185,7 @@ void LocoNetThrottle::process100msActions(void) {
   }
 }
 
-bool LocoNetThrottle::processMessage(lnMsg *LnPacket) {
+bool LocoNetThrottle::processMessage(const lnMsg *LnPacket) {
   uint8_t  Data2;
   uint16_t  SlotAddress;
 
@@ -215,9 +215,11 @@ bool LocoNetThrottle::processMessage(lnMsg *LnPacket) {
         updateState(TH_ST_IN_USE, 1);
 
         // Now Write our own Throttle Id to the slot and write it back to the command station
-        LnPacket->sd.command = OPC_WR_SL_DATA;
-        LnPacket->sd.id1 = (uint8_t)(_throttleId & 0x7F);
-        LnPacket->sd.id2 = (uint8_t)(_throttleId >> 7);
+        lnMsg txPacket = *LnPacket;
+        txPacket.sd.command = OPC_WR_SL_DATA;
+        txPacket.sd.id1 = (uint8_t)(_throttleId & 0x7F);
+        txPacket.sd.id2 = (uint8_t)(_throttleId >> 7);
+        _locoNet.send(&txPacket);
         return true;
       // Ok another throttle did a NULL MOVE with the same slot before we did
       // so we have to try again

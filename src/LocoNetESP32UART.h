@@ -42,16 +42,16 @@
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
 
-class LocoNetESP32Uart: public LocoNet {
+class LocoNetESP32Uart: public LocoNetBackend {
 	public:
 		
-		LocoNetESP32Uart(uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 
+		LocoNetESP32Uart(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 
 				bool invertedRx, bool invertedTx,
 				bool enablePullup, const BaseType_t preferedCore=1);
-		LocoNetESP32Uart(uint8_t rxPin=16, uint8_t txPin=15, uint8_t uartNum=1, 
+		LocoNetESP32Uart(LocoNetBus *bus, uint8_t rxPin=16, uint8_t txPin=15, uint8_t uartNum=1, 
 				bool inverted=false,
 				bool enablePullup=false, const BaseType_t preferedCore=1) 
-				: LocoNetESP32Uart(rxPin, txPin, uartNum, inverted, inverted, enablePullup, preferedCore)
+				: LocoNetESP32Uart(bus, rxPin, txPin, uartNum, inverted, inverted, enablePullup, preferedCore)
 				{}
 
 		virtual bool begin();

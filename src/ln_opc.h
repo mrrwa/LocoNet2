@@ -683,9 +683,9 @@ typedef union {
 		multiSenseDeviceInfoMsg	msdi;
 		uint8_t					data[16];
         uint8_t length() const { return LOCONET_PACKET_SIZE(sz.command, sz.mesg_size); }
-} lnMsg ;
+} LnMsg ;
 
-#define LnMsg lnMsg;
+#define lnMsg LnMsg
 
 /* loconet opcodes */
 #define OPC_BUSY          0x81

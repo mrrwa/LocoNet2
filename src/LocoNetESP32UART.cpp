@@ -23,10 +23,10 @@ extern "C" void uartDetachTx(uart_t* uart);
 extern "C" void uartAttachRx(uart_t* uart, uint8_t rxPin, bool inverted);
 extern "C" void uartAttachTx(uart_t* uart, uint8_t txPin, bool inverted);
 
-LocoNetESP32Uart::LocoNetESP32Uart(uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 
+LocoNetESP32Uart::LocoNetESP32Uart(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 
 		bool invertedRx, bool invertedTx, bool enablePullup, const BaseType_t preferedCore
 		) :
-	LocoNet(), _rxPin(rxPin), _txPin(txPin), _invertedRx(invertedRx), _invertedTx(invertedTx), 
+	LocoNetBackend(bus), _rxPin(rxPin), _txPin(txPin), _invertedRx(invertedRx), _invertedTx(invertedTx), 
 	_preferedCore(preferedCore), _state(IDLE) 
 {
 	DEBUG("Initializing UART(%d) with RX:%d, TX:%d", uartNum, _rxPin, _txPin);

@@ -1,8 +1,10 @@
-#include <Arduino.h>
+#include "LocoNetESP32.h"
+
 #include <functional>
 #include <algorithm>
 #include "LocoNet.h"
-#include "LocoNetESP32.h"
+#include "LocoNetSVCV.h"
+
 
 #include <esp_task_wdt.h>
 
@@ -35,7 +37,7 @@ void IRAM_ATTR locoNetStartBitCallback() {
     locoNetInstance->loconetStartBit();
 }
 
-LocoNetESP32::LocoNetESP32(uint8_t rxPin, uint8_t txPin, uint8_t timerId) : LocoNet(), _rxPin(rxPin), _txPin(txPin), _timerId(timerId) {
+LocoNetESP32::LocoNetESP32(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t timerId) : LocoNetBackend(bus), _rxPin(rxPin), _txPin(txPin), _timerId(timerId) {
     // stash away a pointer to this instance for callback functions
     locoNetInstance = this;
 }

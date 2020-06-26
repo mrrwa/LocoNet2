@@ -63,7 +63,7 @@
  *
  *****************************************************************************/
 #include <string.h>
-#include "LocoNet.h"
+#include "LocoNetFastClock.h"
 
 constexpr uint16_t FC_FRAC_MIN_BASE   				    = 0x3FFF;
 constexpr uint8_t FC_FRAC_RESET_HIGH              = 0x78;
@@ -82,7 +82,7 @@ void LocoNetFastClock::poll() {
   _locoNet.send(OPC_RQ_SL_DATA, FC_SLOT, 0);
 }
 
-void LocoNetFastClock::processMessage(lnMsg *packet) {
+void LocoNetFastClock::processMessage(const lnMsg *packet) {
   if(packet->fc.clk_cntrl & 0x40) {
     if(_state >= FC_ST_REQ_TIME) {
       _data.fc = packet->fc;

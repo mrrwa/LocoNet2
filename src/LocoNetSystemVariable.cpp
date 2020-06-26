@@ -63,11 +63,11 @@
  *
  *****************************************************************************/
 
-#include "LocoNet.h"
+#include "LocoNetSVCV.h"
 
 LocoNetSystemVariable::LocoNetSystemVariable(LocoNet &locoNet, uint8_t mfgId, uint8_t devId, uint16_t productId, uint8_t swVersion) :
   _locoNet(locoNet), _mfgId(mfgId), _devId(devId), _productId(productId), _swVersion(swVersion), _deferredProcessingRequired(false), _deferredSrcAddr(0) {
-  _locoNet.onPacket(OPC_PEER_XFER, [this](lnMsg *rxPacket) {
+  _locoNet.onPacket(OPC_PEER_XFER, [this](const lnMsg *rxPacket) {
     this->processMessage(rxPacket);
   });
 }
@@ -158,8 +158,11 @@ void encodePeerData(peerXferMsg *pMsg, uint8_t *pInData) {
   }
 }
 
-SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket) {
+SV_STATUS LocoNetSystemVariable::processMessage(const lnMsg *rxPacket) {
   SV_Addr_t unData;
+
+  lnMsg copy = *rxPacket;
+  lnMsg *LnPacket = &copy;
 
   if((LnPacket->sv.mesg_size != 0x10) ||
      (LnPacket->sv.command != OPC_PEER_XFER) ||
@@ -252,7 +255,7 @@ SV_STATUS LocoNetSystemVariable::processMessage(lnMsg *LnPacket) {
 
   encodePeerData(&LnPacket->px, unData.abPlain); // recycling the received packet
   LnPacket->sv.sv_cmd |= 0x40;    // flag the message as reply
-  LN_STATUS lnStatus = _locoNet.send(LnPacket, LN_BACKOFF_INITIAL);
+  LN_STATUS lnStatus = _locoNet.send(LnPacket);
   DEBUG("LNSV Send Response - Status: %d", lnStatus);
 
   if (lnStatus != LN_DONE) {

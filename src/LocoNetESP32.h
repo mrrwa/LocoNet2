@@ -37,14 +37,14 @@
 #pragma once
 
 #include "LocoNet.h"
+#include <Arduino.h>
 #include <esp32-hal-timer.h>
 
 
-
-class LocoNetESP32: public LocoNet
+class LocoNetESP32: public LocoNetBackend
 {
     public:
-        LocoNetESP32(uint8_t rxPin=16, uint8_t txPin=15, uint8_t timerId=0);
+        LocoNetESP32(LocoNetBus *bus, uint8_t rxPin=16, uint8_t txPin=15, uint8_t timerId=0);
         virtual bool begin();
         virtual void end();
 

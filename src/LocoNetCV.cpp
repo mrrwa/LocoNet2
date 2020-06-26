@@ -51,7 +51,7 @@
  *
  *****************************************************************************/
 
-#include "LocoNet.h"
+#include "LocoNetSVCV.h"
 #include <Arduino.h>
 
 // Adresses for the 'SRC' part of an UhlenbrockMsg
@@ -93,10 +93,12 @@ LocoNetCV::LocoNetCV(LocoNet &locoNet) : _locoNet(locoNet) {
     _locoNet.onPacket(OPC_PEER_XFER, std::bind(&LocoNetCV::processLNCVMessage, this, std::placeholders::_1));
 }
 
-void LocoNetCV::processLNCVMessage(lnMsg * LnPacket) {
+void LocoNetCV::processLNCVMessage(const lnMsg * rxPacket) {
     DEBUG("Possibly a LNCV message.");
     // Either of these message types may be a LNCV message
     // Sanity check: Message length, Verify addresses
+    lnMsg rxCopy = *rxPacket;
+    lnMsg * LnPacket = &rxCopy;
     if (LnPacket->ub.mesg_size == 15 && LnPacket->ub.DSTL == LNCV_MODULE_DSTL && LnPacket->ub.DSTH == LNCV_MODULE_DSTH) {
         // It is a LNCV programming message
         computeBytesFromPXCT(LnPacket->ub);
