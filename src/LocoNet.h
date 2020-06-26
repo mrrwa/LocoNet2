@@ -72,7 +72,7 @@
 
 #include "ln_opc.h"
 #include "LocoNetMessageBuffer.h"
-#include "LocoNetBus.h"
+#include "Bus.h"
 
 #ifdef DEBUG_OUTPUT
 #if defined(ESP32) && ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
