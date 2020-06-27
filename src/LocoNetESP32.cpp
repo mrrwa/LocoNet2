@@ -37,7 +37,9 @@ void IRAM_ATTR locoNetStartBitCallback() {
     locoNetInstance->loconetStartBit();
 }
 
-LocoNetESP32::LocoNetESP32(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t timerId) : LocoNetBackend(bus), _rxPin(rxPin), _txPin(txPin), _timerId(timerId) {
+LocoNetESP32::LocoNetESP32(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t timerId) 
+    : LocoNetBackend(bus), _rxPin(rxPin), _txPin(txPin), _timerId(timerId) 
+{
     // stash away a pointer to this instance for callback functions
     locoNetInstance = this;
 }
@@ -171,7 +173,8 @@ void IRAM_ATTR LocoNetESP32::loconetStartBit() {
 
     // make sure we sample the next bit
     timerStop(_lnTimer);
-    timerAlarmWrite(_lnTimer, 15, true); // we try to sample in the middle of bit, 1.5 bits from start bit edge
+    //timerAlarmWrite(_lnTimer, 15, true); // we try to sample in the middle of bit, 1.5 bits from start bit edge
+    timerAlarmWrite(_lnTimer, 6, true); // we try to sample in the middle of bit, 1.5 bits from start bit edge
     changeState(LN_ST_RX, NO_LOCK);
 
     portEXIT_CRITICAL_ISR(&_timerMux);

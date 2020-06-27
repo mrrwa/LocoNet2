@@ -74,14 +74,16 @@
 #include "LocoNetMessageBuffer.h"
 #include "Bus.h"
 
+#define DEBUG_OUTPUT_
+
 #ifdef DEBUG_OUTPUT
 #if defined(ESP32) && ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
 #include <esp32-hal-log.h>
 #define DEBUG(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
 #define DEBUG_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
 #else
-#define DEBUG printf
-#define DEBUG_ISR printf
+#define DEBUG(...) { printf(__VA_ARGS__); printf("\n"); }
+#define DEBUG_ISR(...) // { printf(__VA_ARGS__); printf("\n"); }
 #endif
 #else
 #define DEBUG(format, ...)
@@ -175,7 +177,7 @@ LN_STATUS reportSwitch(LocoNetBus *ln, uint16_t Address);
 LN_STATUS reportSensor(LocoNetBus *ln, uint16_t Address, uint8_t State);
 LN_STATUS reportPower(LocoNetBus *ln, bool state);
 
-class LocoNetDispatcher {
+class LocoNetDispatcher : public LocoNetConsumer {
     public:
         LocoNetDispatcher(LocoNetBus *ln);
         void begin() {}

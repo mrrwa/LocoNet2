@@ -10,6 +10,15 @@
 
 #include "ln_opc.h"
 
+#define BUS_DEBUG_
+
+#ifdef BUS_DEBUG
+#include <Arduino.h>
+#define BUS_DEBUGF(...)  { Serial.printf(__VA_ARGS__); }
+#else
+#define BUS_DEBUGF(...)
+#endif
+
 template < class Msg, class Ret >
 class Consumer {
 public:
@@ -22,6 +31,9 @@ public:
     using MsgConsumer = Consumer<Msg, Ret>;
 
     Ret broadcast(const Msg &msg, MsgConsumer* sender = nullptr) {
+        
+        BUS_DEBUGF("broadcasting message\n");
+
         Ret ret = okVal;
         for(const auto & c: consumers) {
             if(c!=sender) {

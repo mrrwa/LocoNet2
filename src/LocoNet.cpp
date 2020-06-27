@@ -170,7 +170,7 @@ LnTxStats* LocoNetBackend::getTxStats() {
 
 void LocoNetBackend::consume(uint8_t newByte) {
 	lnMsg * rxPacket = rxBuffer.addByte(newByte);
-
+  
 	if (rxPacket != nullptr) {
     bus->broadcast(*rxPacket);
 	}
@@ -246,7 +246,7 @@ LN_STATUS reportSensor(LocoNetBus *ln,  uint16_t Address, uint8_t State ) {
 
 
 LocoNetDispatcher::LocoNetDispatcher(LocoNetBus *ln): ln(ln) {
-
+  ln->addConsumer(this);
 }
 
 LN_STATUS LocoNetDispatcher::onMessage(const lnMsg& msg) {
@@ -278,7 +278,7 @@ void LocoNetDispatcher::processPacket(const lnMsg *packet) {
       }
 #if defined(DEBUG_OUTPUT)
     } else {
-      DEBUG("No callbacks for OpCode %02x", rxPacket->sz.command);
+      DEBUG("No callbacks for OpCode %02x", packet->sz.command);
 #endif
     }
     
@@ -289,7 +289,7 @@ void LocoNetDispatcher::onPacket(uint8_t opCode, std::function<void(const lnMsg 
 
   callbacks[opCode].push_back(callback);
   DEBUG("registering callback function for OpCode: %02x, %d callbacks for this OpCode.", 
-    OpCode, callbacks[OpCode].size());
+    opCode, callbacks[opCode].size());
 }
 
 void LocoNetDispatcher::onSensorChange(std::function<void(uint16_t, bool)> callback) {
