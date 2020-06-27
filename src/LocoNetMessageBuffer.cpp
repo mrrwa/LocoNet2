@@ -82,7 +82,7 @@ lnMsg *LocoNetMessageBuffer::getMsg() {
 	}
 
 	if(expLen == index) {
-		if(checkSum == buffer[index-1]) {
+		if(checkSum == 0) {
 			stats.rxPackets++;
 			return (lnMsg*)buffer;
 		} else {
@@ -96,13 +96,13 @@ lnMsg *LocoNetMessageBuffer::getMsg() {
 lnMsg *LocoNetMessageBuffer::addByte(uint8_t newByte) {
 	if(index < LN_BUF_SIZE) {
 		// Reset the buffer to empty when a LocoNet OPC code is received
-		if(newByte & 0x80) {
+		if( (newByte & 0x80) != 0) {
 			index = 0;
 			expLen = 0;
 			checkSum = LN_CHECKSUM_SEED;
 		}
 		buffer[index++] = newByte;
-		if((index <= 2 ) || (index < expLen)) {
+		if((index <= 2 ) || (index <= expLen)) {
 		    checkSum ^= newByte;
 		}
 	}
