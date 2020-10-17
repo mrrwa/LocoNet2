@@ -15,10 +15,12 @@
 #ifdef GPIO_DEBUG
 #define DEBUG_IOPIN 14
 #define DEBUG_PIN_SB 12
-#define DEBUG_PIN_TIMER 13
+#define DEBUG_PIN_TIMER 27
 uint8_t debugPinVal=0;
+uint8_t debugPinVal2=0;
 #endif
 
+//#define DEBUG_OUTPUT
 #ifdef DEBUG_OUTPUT
 char _msg[1024];
 char _buf[100];
@@ -73,7 +75,7 @@ bool LocoNetESP32::begin() {
     
 
 #ifdef GPIO_DEBUG
-    //pinMode(DEBUG_IOPIN, OUTPUT);
+    pinMode(DEBUG_IOPIN, OUTPUT);
     pinMode(DEBUG_PIN_TIMER, OUTPUT);
     pinMode(DEBUG_PIN_SB, OUTPUT);
     //pinMode(DEBUG_BIT_GEN, OUTPUT);
@@ -102,22 +104,38 @@ void LocoNetESP32::end() {
 
 void LocoNetESP32::enableStartBitISR(bool en) {
     if(en) {
-        //DEBUG("Attach the startbit ISR");
+        DEBUG_ISR("Attach the startbit ISR");
         if(_isrAttached) return;
         attachInterrupt(digitalPinToInterrupt(_rxPin), locoNetStartBitCallback,
             (LOCONET_RX_HIGH==HIGH) ? FALLING : RISING);
         _isrAttached = true;
+
+        // #ifdef GPIO_DEBUG
+        // //digitalWrite(DEBUG_IOPIN, debugPinVal2%2 ); debugPinVal2++;    
+        // digitalWrite(DEBUG_IOPIN, HIGH ); 
+        // #endif
     } else {
+        DEBUG_ISR("Removing startbit ISR");
         if(!_isrAttached) return;
-        //DEBUG("Removing startbit ISR");
         detachInterrupt(digitalPinToInterrupt(_rxPin));
         _isrAttached = false;
+
+        // #ifdef GPIO_DEBUG
+        // digitalWrite(DEBUG_IOPIN, LOW ); 
+        // #endif
     }
 }
 
 void IRAM_ATTR LocoNetESP32::changeState(LN_TX_RX_STATUS newStat, Lock lock, uint8_t bit) {
     if(lock==Lock::LOCK) portENTER_CRITICAL(&_timerMux);
     else if(lock==Lock::LOCK_FROM_ISR) portENTER_CRITICAL_ISR(&_timerMux);
+
+    DEBUG_ISR("changeState %d", newStat);
+    // #ifdef GPIO_DEBUG
+    // digitalWrite(DEBUG_IOPIN, HIGH);//debugPinVal2%2);  debugPinVal2+=1;
+    // delayMicroseconds( newStat+1);
+    // digitalWrite(DEBUG_IOPIN, LOW);
+    // #endif
 
     if(newStat == LN_ST_IDLE || newStat == LN_ST_CD_BACKOFF) {
         enableStartBitISR();
@@ -163,8 +181,9 @@ void IRAM_ATTR LocoNetESP32::loconetStartBit() {
 #ifdef GPIO_DEBUG
     //static uint8_t i=0;
     //digitalWrite(, (i++)%2 );
-    digitalWrite(DEBUG_PIN_SB, debugPinVal%2 ); debugPinVal++;
-    digitalWrite(DEBUG_PIN_TIMER, LOW );  
+    digitalWrite(DEBUG_PIN_TIMER, debugPinVal%2 ); debugPinVal++; 
+    digitalWrite(DEBUG_PIN_SB, HIGH );  
+    //digitalWrite(DEBUG_IOPIN, LOW );  
 #endif
 
     DEBUG_ISR("StartBit");
@@ -173,8 +192,8 @@ void IRAM_ATTR LocoNetESP32::loconetStartBit() {
 
     // make sure we sample the next bit
     timerStop(_lnTimer);
-    //timerAlarmWrite(_lnTimer, 15, true); // we try to sample in the middle of bit, 1.5 bits from start bit edge
-    timerAlarmWrite(_lnTimer, 6, true); // we try to sample in the middle of bit, 1.5 bits from start bit edge
+    timerAlarmWrite(_lnTimer, 13, true); // we try to sample in the middle of bit (5), skip start bit (10)
+    
     changeState(LN_ST_RX, NO_LOCK);
 
     portEXIT_CRITICAL_ISR(&_timerMux);
@@ -188,6 +207,10 @@ void IRAM_ATTR LocoNetESP32::loconetStartBit() {
 void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
 
     //portENTER_CRITICAL_ISR(&_timerMux);
+
+    #ifdef GPIO_DEBUG
+    digitalWrite(DEBUG_PIN_TIMER, debugPinVal % 2);  debugPinVal++;
+    #endif
 
     // Make sure the timer is set correctly for the next bit
     timerAlarmWrite(_lnTimer, 10, true);
@@ -204,12 +227,11 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
             if(v == LOCONET_RX_HIGH)  {
                 _lnCurrentRxByte |= 0x80;
             } 
-            DEBUG_ISR("n=%d, v=%d", _currentBit, v);
+            //DEBUG_ISR("n=%d, v=%d", _currentBit, v);
             _currentBit++;
 
             #ifdef GPIO_DEBUG
-            digitalWrite(DEBUG_PIN_TIMER, v );  
-            digitalWrite(DEBUG_PIN_SB, debugPinVal % 2);  debugPinVal++;
+            //digitalWrite(DEBUG_IOPIN, v );
             #endif
         } else {
             //DEBUG_ISR("byte is %02x", _lnCurrentRxByte);
@@ -229,7 +251,8 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
             }
 
             #ifdef GPIO_DEBUG
-            digitalWrite(DEBUG_PIN_TIMER, HIGH );  
+            digitalWrite(DEBUG_PIN_SB, LOW ); 
+            //digitalWrite(DEBUG_IOPIN, HIGH );   
             #endif
 
             changeState(LN_ST_CD_BACKOFF, Lock::LOCK_FROM_ISR);
@@ -240,10 +263,6 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
     }
         
     case LN_ST_TX:   { // here _currentBit is what bit should be sent this time.
-
-        #ifdef GPIO_DEBUG
-        digitalWrite(DEBUG_PIN_SB, debugPinVal % 2);  debugPinVal++;
-        #endif
 
         //DEBUG("bit %d, rx: %d / tx: %d", _currentBit, digitalRead(_rxPin), digitalRead(_txPin)==LOCONET_TX_HIGH);
         if( ( (_currentBit!=0) && checkCollision()) || ( (_currentBit==0) && (digitalRead(_rxPin)==LOCONET_RX_LOW) ))  {
