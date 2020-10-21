@@ -124,7 +124,7 @@ LN_STATUS LocoNetBackend::send(lnMsg *pPacket, uint8_t ucPrioDelay) {
   int _l = strlen(_msg);
   for(uint8_t i=0; i<packetLen; i++)
     _l += sprintf(_msg+_l, " %02x", pPacket->data[i]);  
-  DEBUG(_msg);
+  DEBUG("%s", _msg);
 #endif
   
   for (uint8_t ucTry = 0; ucTry < LN_TX_RETRIES_MAX; ucTry++) {
@@ -143,6 +143,7 @@ LN_STATUS LocoNetBackend::send(lnMsg *pPacket, uint8_t ucPrioDelay) {
         // now entered backoff -> next state != LN_BACKOFF is worth incrementing the try counter
         ucWaitForEnterBackoff = false;
       }
+      break;
     } while ((enReturn == LN_CD_BACKOFF) ||                             // waiting CD backoff
              (enReturn == LN_PRIO_BACKOFF) ||                           // waiting master+prio backoff
             ((enReturn == LN_NETWORK_BUSY) && ucWaitForEnterBackoff));  // or within any traffic unfinished
@@ -172,7 +173,7 @@ void LocoNetBackend::consume(uint8_t newByte) {
 	lnMsg * rxPacket = rxBuffer.addByte(newByte);
   
 	if (rxPacket != nullptr) {
-    bus->broadcast(*rxPacket);
+    bus->broadcast(*rxPacket, this);
 	}
 }
 

@@ -47,11 +47,11 @@ class LocoNetESP32Hybrid: public LocoNetBackend {
 		
 		LocoNetESP32Hybrid(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 
 				bool invertedRx, bool invertedTx,
-				bool enablePullup, const int timerId=0, const BaseType_t preferedCore=1);
+				const int timerId=0, const BaseType_t preferedCore=1);
 		LocoNetESP32Hybrid(LocoNetBus *bus, uint8_t rxPin=16, uint8_t txPin=15, uint8_t uartNum=1, 
 				bool inverted=false,
-				bool enablePullup=false, const int timerId=0, const BaseType_t preferedCore=1) 
-				: LocoNetESP32Hybrid(bus, rxPin, txPin, uartNum, inverted, inverted, enablePullup, preferedCore)
+				const int timerId=0, const BaseType_t preferedCore=1) 
+				: LocoNetESP32Hybrid(bus, rxPin, txPin, uartNum, inverted, inverted, timerId, preferedCore)
 				{}
 
 		virtual bool begin();
@@ -60,9 +60,9 @@ class LocoNetESP32Hybrid: public LocoNetBackend {
 		LN_STATUS sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay);
 	private:
 		void startCollisionTimer();
-		bool checkCollisionTimer();
+		bool collisionTimerElapsed();
 		void startCDBackoffTimer();
-		bool checkCDBackoffTimer();
+		bool cdBackoffTimerElapsed();
 		void rxtxTask();
 		typedef enum {
 			IDLE = 0,		// net is free for anyone to start transmission

@@ -2,8 +2,8 @@
 #include <esp_task_wdt.h>
 
 
-constexpr UBaseType_t LocoNetRXTXThreadPriority = 2;
-constexpr uint32_t LocoNetRXTXThreadStackSize = 1024;
+constexpr UBaseType_t LocoNetRXTXThreadPriority = 1;
+constexpr uint32_t LocoNetRXTXThreadStackSize = 2048;
 
 // number of microseconds for one bit
 constexpr uint8_t LocoNetTickTime = 60;
@@ -27,6 +27,7 @@ extern "C" void uartAttachTx(uart_t* uart, uint8_t txPin, bool inverted);
 #define INV_VAL(V) ((V)==HIGH ? LOW : HIGH)
 #define TX_LOW_VAL  (INV_VAL(TX_HIGH_VAL))
 #define RX_LOW_VAL  (INV_VAL(RX_HIGH_VAL))
+#define TX_IDLE_VAL  TX_HIGH_VAL
 
 static LocoNetESP32Hybrid *_inst = nullptr;
 
@@ -40,17 +41,20 @@ void taskEntryPoint(void *param) {
 
 
 LocoNetESP32Hybrid::LocoNetESP32Hybrid(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 
-		bool invertedRx, bool invertedTx, bool enablePullup, const int timerId, const BaseType_t preferedCore
+		bool invertedRx, bool invertedTx, const int timerId, const BaseType_t preferedCore
 		) :
 	LocoNetBackend(bus), _rxPin(rxPin), _txPin(txPin), _invertedRx(invertedRx), _invertedTx(invertedTx), 
-	_preferedCore(preferedCore), TX_HIGH_VAL(invertedTx?LOW:HIGH), RX_HIGH_VAL(invertedRx?HIGH:LOW), _state(IDLE), _timerId(timerId)
+	_preferedCore(preferedCore), TX_HIGH_VAL(invertedTx?LOW:HIGH), RX_HIGH_VAL(invertedRx?LOW:HIGH), _state(IDLE), _timerId(timerId)
 {
-	DEBUG("Initializing UART(%d) with RX:%d, TX:%d", uartNum, _rxPin, _txPin);
-	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, _txPin, 256, false);
-	if(_invertedRx) {		
+	_inst = this;
+
+	DEBUG("Initializing UART%d with RX:%d(%c), TX:%d(%c), timer %d", uartNum, _rxPin, _invertedRx?'I':'n', _txPin, _invertedTx?'I':'n', _timerId);
+	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, -1, 256, _invertedRx);
+	/*if(_invertedRx) {		
 		uartDetachRx(_uart);
 		uartAttachRx(_uart, _rxPin, true);
-	}
+	}*/
+	
 	/*if(_invertedTx) {
 		uartDetachTx(_uart);
 		uartAttachTx(_uart, _txPin, true);
@@ -58,11 +62,15 @@ LocoNetESP32Hybrid::LocoNetESP32Hybrid(LocoNetBus *bus, uint8_t rxPin, uint8_t t
 
 	_rxtxTask = nullptr;
 	// note: this needs to be done after uartBegin which will set the pin mode to INPUT only.
+	/*
 	if(enablePullup) {
 		pinMode(_rxPin, invertedRx ? INPUT_PULLDOWN : INPUT_PULLUP);
 	}
+	*/
 
-	_inst = this;
+	pinMode(_txPin, OUTPUT);
+	digitalWrite(_txPin, TX_IDLE_VAL); // release bus
+	
 }
 
 bool LocoNetESP32Hybrid::begin() {
@@ -90,8 +98,12 @@ bool LocoNetESP32Hybrid::begin() {
 		printf("LocoNet ERROR: Could not create timer!\n");
 		return false;
 	}
-    timerAttachInterrupt(_lnTimer, txTimerCb, true);
+    timerAttachInterrupt(_lnTimer, &txTimerCb, true);
     timerAlarmWrite(_lnTimer, 10, true);
+	//timerAlarmWrite(_lnTimer, 10000, true);
+	//timerAlarmEnable(_lnTimer);
+	timerAlarmEnable(_lnTimer);
+	timerStop(_lnTimer);
 
 	return true;
 }
@@ -129,7 +141,7 @@ void LocoNetESP32Hybrid::startCollisionTimer() {
 /**
  * @return false is collision timer is still ticking
  */
-bool LocoNetESP32Hybrid::checkCollisionTimer() {
+bool LocoNetESP32Hybrid::collisionTimerElapsed() {
 	return _collisionTimeout <= (uint64_t)esp_timer_get_time();
 }
 
@@ -139,30 +151,31 @@ void LocoNetESP32Hybrid::startCDBackoffTimer() {
 	_cdBackoffTimeout = _cdBackoffStart + CDBackoffTimeoutIncrement;
 }
 
-bool LocoNetESP32Hybrid::checkCDBackoffTimer() {
+bool LocoNetESP32Hybrid::cdBackoffTimerElapsed() {
 	return _cdBackoffTimeout <= (uint64_t)esp_timer_get_time();
 }
 
 void LocoNetESP32Hybrid::rxtxTask() {
 	// add this thread to the WDT
-	esp_task_wdt_add(NULL);
+	//esp_task_wdt_add(NULL);
 
 	while(true) {
-		esp_task_wdt_reset();
+		//esp_task_wdt_reset();
 		// process incoming first
+		
 		if(uartAvailable(_uart)) {
 			DEBUG("RX Begin");
 			// start RX to consume available data
 			_state = RX;
 			while(uartAvailable(_uart)) {
-				esp_task_wdt_reset();
+				//esp_task_wdt_reset();
 				consume(uartRead(_uart));
 			}
 			DEBUG("RX End");
 			// successful RX, switch to CD_BACKOFF
 			startCDBackoffTimer();
-		} else if(_state == CD_BACKOFF && checkCDBackoffTimer()) {
-			DEBUG("Switching to IDLE");
+		} else if(_state == CD_BACKOFF && cdBackoffTimerElapsed()) {
+			DEBUG("Switching to IDLE after backoff");
 			_state = IDLE;
 		} else if(_state == IDLE) {
 			LOCONET_TX_LOCK();
@@ -171,31 +184,40 @@ void LocoNetESP32Hybrid::rxtxTask() {
 				// last chance check for TX_COLLISION before starting TX
 				// st_urx_out contains the status of the UART RX state machine,
 				// any value other than zero indicates it is active.
-				if(uartRxActive(_uart) ||
-					digitalRead(_rxPin) == RX_LOW_VAL) {
+				if(uartRxActive(_uart) || digitalRead(_rxPin) == RX_LOW_VAL) {
+					DEBUG("uartActive: %d / digitalRead: %d",uartRxActive(_uart)?1:0,  digitalRead(_rxPin) == RX_LOW_VAL?1:0);
 					startCollisionTimer();
 				} else  {
 					// no collision, start TX
 					_state = TX;
 					while(uxQueueMessagesWaiting(_txQueue) > 0 && _state == TX) {
 						uint8_t out;
+						uint32_t t0=0;
 						if(xQueueReceive(_txQueue, &out, (portTickType)1)) {
-							
+							DEBUG("sending %02x -> %04x", out, txByte);
 							txByte = 1<<9 | out<<1 | 0; 
 							txBit = 0;
-							timerAlarmEnable(_lnTimer);
+							//timerAlarmEnable(_lnTimer);
+							
+							timerRestart(_lnTimer);
 
 							// wait for echo byte before sending next byte
+							uint32_t t1=micros();
 							while(!uartAvailable(_uart)) {
 								esp_task_wdt_reset();
-								delay(1);
+								//delay(1);
 							}
+							t0 += (micros()-t1);
+							DEBUG("Took %d uS", t0);
 							// check echoed byte for collision
-							if(uartRead(_uart) != out) {
+							uint8_t tt = uartRead(_uart);
+							if(tt != out) {
+								DEBUG("Got %02x, expected %02x", tt, out);
 								startCollisionTimer();
+								digitalWrite(_txPin, TX_LOW_VAL);
 							}
 						}
-						esp_task_wdt_reset();
+						//esp_task_wdt_reset();
 					}
 					if(_state == TX) {
 						// TX done, switch to CD_BACKOFF
@@ -210,39 +232,46 @@ void LocoNetESP32Hybrid::rxtxTask() {
 				DEBUG("TX End");
 			}
 			LOCONET_TX_UNLOCK();
-		} else if(_state == TX_COLLISION && checkCollisionTimer()) {
-			digitalWrite(_txPin, TX_HIGH_VAL);
+		} else if(_state == TX_COLLISION && collisionTimerElapsed()) {
+			digitalWrite(_txPin, TX_IDLE_VAL);
 			startCDBackoffTimer();
 			DEBUG("TX COLLISION TIMER elapsed");
 		} else {
-			digitalWrite(_txPin, TX_LOW_VAL);
+			digitalWrite(_txPin, TX_IDLE_VAL);
 		}
-		esp_task_wdt_reset();
-		delay(1);
+		//esp_task_wdt_reset();
+		//delay(1);
+		yield();
 	}
 }
 
 void LocoNetESP32Hybrid::txBitTimerFunc() {
+	//timerAlarmWrite(_lnTimer, 10, true);
 	bool bit = txByte & (1<<txBit);
+	//if (txBit>9) return;
+	//DEBUG_ISR("%d=%d", txBit, bit);
 	digitalWrite( _txPin, bit ? TX_HIGH_VAL : TX_LOW_VAL );
-	txBit++;
-	if(txBit==10) {
-		timerAlarmDisable(_lnTimer);
+	if(txBit==9) {
+		timerStop(_lnTimer);
+		//DEBUG_ISR("disabling %d", 1);
+		//timerAlarmDisable(_lnTimer);
 	}
+	txBit++;
 }
 
 LN_STATUS LocoNetESP32Hybrid::sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay)
 {
 	if(_txQueue) {
 		if (_state == CD_BACKOFF) {
-			if(micros() < _cdBackoffStart + (LocoNetTickTime * ucPrioDelay)) {
+			if(esp_timer_get_time() < _cdBackoffStart + (LocoNetTickTime * ucPrioDelay)) {
 				_state = IDLE;
-			} else if(!checkCDBackoffTimer()) {
+			} else if(!cdBackoffTimerElapsed()) {
 				return LN_CD_BACKOFF;
 			} else {
 				return LN_PRIO_BACKOFF;
 			}
 		} else if(_state != IDLE) {
+			DEBUG("sendLocoNetPacketTry, state=%d", _state);
 			return LN_NETWORK_BUSY;
 		}
 		LOCONET_TX_LOCK();

@@ -1,8 +1,8 @@
 #include "LocoNetESP32UART.h"
 #include <esp_task_wdt.h>
 
-constexpr UBaseType_t LocoNetRXTXThreadPriority = 2;
-constexpr uint32_t LocoNetRXTXThreadStackSize = 1600;
+constexpr UBaseType_t LocoNetRXTXThreadPriority = 1;
+constexpr uint32_t LocoNetRXTXThreadStackSize = 2048;
 
 // number of microseconds for one bit
 constexpr uint8_t LocoNetTickTime = 60;
@@ -147,13 +147,17 @@ void LocoNetESP32Uart::rxtxTask() {
 					_state = TX;
 					while(uxQueueMessagesWaiting(_txQueue) > 0 && _state == TX) {
 						uint8_t out;
+						uint32_t t0=0;
 						if(xQueueReceive(_txQueue, &out, (portTickType)1)) {
 							uartWrite(_uart, out);
 							// wait for echo byte before sending next byte
+							uint32_t t1=micros();
 							while(!uartAvailable(_uart)) {
 								esp_task_wdt_reset();
-								delay(1);
+								//delay(1);
 							}
+							t0 += (micros()-t1);
+							DEBUG("Took %d uS", t0);
 							// check echoed byte for collision
 							if(uartRead(_uart) != out) {
 								startCollisionTimer();

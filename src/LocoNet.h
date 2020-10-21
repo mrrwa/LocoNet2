@@ -74,16 +74,17 @@
 #include "LocoNetMessageBuffer.h"
 #include "Bus.h"
 
-#define DEBUG_OUTPUT_
+#define DEBUG_OUTPUT
 
 #ifdef DEBUG_OUTPUT
+#include <cstdio>
 #if defined(ESP32) && ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
 #include <esp32-hal-log.h>
 #define DEBUG(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
 #define DEBUG_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
 #else
 #define DEBUG(...) { printf(__VA_ARGS__); printf("\n"); }
-#define DEBUG_ISR(...) // { printf(__VA_ARGS__); printf("\n"); }
+#define DEBUG_ISR(...) { printf(__VA_ARGS__); printf("\n"); }
 #endif
 #else
 #define DEBUG(format, ...)

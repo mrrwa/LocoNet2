@@ -47,7 +47,7 @@ class LocoNetESP32Uart: public LocoNetBackend {
 		
 		LocoNetESP32Uart(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 
 				bool invertedRx, bool invertedTx,
-				bool enablePullup, const BaseType_t preferedCore=1);
+				bool enablePullup=false, const BaseType_t preferedCore=1);
 		LocoNetESP32Uart(LocoNetBus *bus, uint8_t rxPin=16, uint8_t txPin=15, uint8_t uartNum=1, 
 				bool inverted=false,
 				bool enablePullup=false, const BaseType_t preferedCore=1) 
