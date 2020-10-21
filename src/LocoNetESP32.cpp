@@ -25,8 +25,10 @@ uint8_t debugPinVal2=0;
 char _msg[1024];
 char _buf[100];
 #undef DEBUG_ISR
-#define DEBUG_ISR(...)  do{ snprintf(_buf, 100, __VA_ARGS__); snprintf(_msg, 1024, "%s%s\n", _msg, _buf ); } while(0)
-#define DEBUG_ISR_DUMP()  do{ Serial.print(_msg); _msg[0]=0; } while(0);
+#define DEBUG_ISR(...)
+#define DEBUG_ISR_DUMP()
+//#define DEBUG_ISR(...)  do{ snprintf(_buf, 100, __VA_ARGS__); snprintf(_msg, 1024, "%s%s\n", _msg, _buf ); } while(0)
+//#define DEBUG_ISR_DUMP()  do{ ets_printf(_msg); _msg[0]=0; } while(0);
 #endif
 
 static LocoNetESP32 *locoNetInstance = nullptr;
@@ -53,7 +55,7 @@ bool LocoNetESP32::begin() {
     _rxQueue = xQueueCreate(32, sizeof(uint8_t));    
     _txQueue = xQueueCreate(32, sizeof(uint8_t));
     
-    xTaskCreatePinnedToCore(LocoNetESP32::rxByteProc, "ByteProc", 
+    xTaskCreatePinnedToCore(LocoNetESP32::rxByteProc, "LocoNetPhy", 
         2048, (void* ) this, 2, &_rxByteTask, 1); // cpu1 
 
     DEBUG("Configuring HW Timer %d as bit timer", _timerId);
@@ -129,8 +131,8 @@ void LocoNetESP32::enableStartBitISR(bool en) {
 void IRAM_ATTR LocoNetESP32::changeState(LN_TX_RX_STATUS newStat, Lock lock, uint8_t bit) {
     if(lock==Lock::LOCK) portENTER_CRITICAL(&_timerMux);
     else if(lock==Lock::LOCK_FROM_ISR) portENTER_CRITICAL_ISR(&_timerMux);
-
-    DEBUG_ISR("changeState %d", newStat);
+      
+    DEBUG_ISR("changeState %s", newState==LN_ST_IDLE?"LN_ST_IDLE":newState==LN_ST_CD_BACKOFF?"LN_ST_CD_BACKOFF":newState==LN_ST_TX_COLLISION?"LN_ST_TX_COLLISION":newState==LN_ST_TX?"LN_ST_TX":"LN_ST_RX");
     // #ifdef GPIO_DEBUG
     // digitalWrite(DEBUG_IOPIN, HIGH);//debugPinVal2%2);  debugPinVal2+=1;
     // delayMicroseconds( newStat+1);
@@ -242,7 +244,7 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
             if(digitalRead(_rxPin) == LOCONET_RX_LOW)  {
                 getRxStats()->rxErrors ++;
                 _lnCurrentRxByte = 0;
-                DEBUG_ISR("Err");
+                DEBUG_ISR("Collision");
             } else {
                 /* Send of the received byte for processing */
                 BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -307,10 +309,6 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
 
         if(_currentBit > LN_BACKOFF_MAX) {
             changeState(LN_ST_IDLE, Lock::LOCK_FROM_ISR); 
-            #ifdef DEBUG_ISR_DUMP
-            // do slow printf after realtime stuff stops.
-            DEBUG_ISR_DUMP();
-            #endif
         } else {
             _currentBit++;
         }
@@ -352,6 +350,11 @@ void LocoNetESP32::rxByte() {
             DEBUG("RXed %02x", rx);
             consume(rx);
         }
+
+        #ifdef DEBUG_ISR_DUMP
+        // do slow printf after realtime stuff stops.
+        DEBUG_ISR_DUMP();
+        #endif
 
         yield();
     }

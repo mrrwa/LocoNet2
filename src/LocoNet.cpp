@@ -132,9 +132,11 @@ LN_STATUS LocoNetBackend::send(lnMsg *pPacket, uint8_t ucPrioDelay) {
     // don't want to abort do/while loop before we did not see the backoff state once
     ucWaitForEnterBackoff = true;
     do {
-      DEBUG("calling sendLocoNetPacketTry(%p, %d, %d) attempt %d", packet, packetLen, ucPrioDelay, ucTry);
+      //DEBUG("calling sendLocoNetPacketTry(%p, %d, %d) attempt %d", packet, packetLen, ucPrioDelay, ucTry);
       enReturn = sendLocoNetPacketTry(packet, packetLen, ucPrioDelay);
-      DEBUG("sendLocoNetPacketTry returned %s", enReturn==LN_CD_BACKOFF?"LN_CD_BACKOFF" : enReturn==LN_PRIO_BACKOFF?"LN_PRIO_BACKOFF" : enReturn==LN_NETWORK_BUSY?"LN_NETWORK_BUSY": enReturn==LN_DONE?"LN_DONE": enReturn==LN_COLLISION?"LN_COLLISION": enReturn==LN_UNKNOWN_ERROR?"LN_UNKNOWN_ERROR":"LN_RETRY_ERROR"); 
+      DEBUG("attempt %d, sendLocoNetPacketTry(%p, len=%d, priority=%d)=%s", 
+          ucTry, packet, packetLen, ucPrioDelay,
+          enReturn==LN_CD_BACKOFF?"LN_CD_BACKOFF" : enReturn==LN_PRIO_BACKOFF?"LN_PRIO_BACKOFF" : enReturn==LN_NETWORK_BUSY?"LN_NETWORK_BUSY": enReturn==LN_DONE?"LN_DONE": enReturn==LN_COLLISION?"LN_COLLISION": enReturn==LN_UNKNOWN_ERROR?"LN_UNKNOWN_ERROR":"LN_RETRY_ERROR"); 
       if (enReturn == LN_DONE) { // success?
         return LN_DONE;
       }
@@ -143,7 +145,7 @@ LN_STATUS LocoNetBackend::send(lnMsg *pPacket, uint8_t ucPrioDelay) {
         // now entered backoff -> next state != LN_BACKOFF is worth incrementing the try counter
         ucWaitForEnterBackoff = false;
       }
-      break;
+      //break;
     } while ((enReturn == LN_CD_BACKOFF) ||                             // waiting CD backoff
              (enReturn == LN_PRIO_BACKOFF) ||                           // waiting master+prio backoff
             ((enReturn == LN_NETWORK_BUSY) && ucWaitForEnterBackoff));  // or within any traffic unfinished
