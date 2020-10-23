@@ -72,12 +72,12 @@ class LocoNetESP32: public LocoNetPhy
         const uint8_t _txPin;
         const uint8_t _timerId;
         enum {
-            LOCONET_TX_LOW=HIGH,
-            LOCONET_TX_HIGH=LOW
+            VAL_TX_LOW=HIGH,
+            VAL_TX_HIGH=LOW
         };
         enum {
-            LOCONET_RX_LOW=LOW,
-            LOCONET_RX_HIGH=HIGH
+            VAL_RX_LOW=LOW,
+            VAL_RX_HIGH=HIGH
         };
 
         bool _isrAttached;
@@ -89,10 +89,10 @@ class LocoNetESP32: public LocoNetPhy
         typedef enum {NO_LOCK, LOCK, LOCK_FROM_ISR} Lock;
         void IRAM_ATTR changeState(LN_TX_RX_STATUS newStat, Lock ll=LOCK, uint8_t bit=0);
 
-        void rxByte();
+        void rxByteTaskFunc();
 
         static void rxByteProc(void* pvParams) {
-            ((LocoNetESP32*)pvParams)->rxByte();
+            static_cast<LocoNetESP32*>(pvParams)->rxByteTaskFunc();
         }
 
         friend void locoNetTimerCallback();

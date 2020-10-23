@@ -22,11 +22,11 @@ uint8_t debugPinVal2=0;
 
 //#define DEBUG_OUTPUT
 #ifdef DEBUG_OUTPUT
-char _msg[1024];
-char _buf[100];
 #undef DEBUG_ISR
 #define DEBUG_ISR(...)
 #define DEBUG_ISR_DUMP()
+// char _msg[1024];
+// char _buf[100];
 //#define DEBUG_ISR(...)  do{ snprintf(_buf, 100, __VA_ARGS__); snprintf(_msg, 1024, "%s%s\n", _msg, _buf ); } while(0)
 //#define DEBUG_ISR_DUMP()  do{ ets_printf(_msg); _msg[0]=0; } while(0);
 #endif
@@ -109,7 +109,7 @@ void LocoNetESP32::enableStartBitISR(bool en) {
         DEBUG_ISR("Attach the startbit ISR");
         if(_isrAttached) return;
         attachInterrupt(digitalPinToInterrupt(_rxPin), locoNetStartBitCallback,
-            (LOCONET_RX_HIGH==HIGH) ? FALLING : RISING);
+            (VAL_RX_HIGH==HIGH) ? FALLING : RISING);
         _isrAttached = true;
 
         // #ifdef GPIO_DEBUG
@@ -210,6 +210,8 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
 
     //portENTER_CRITICAL_ISR(&_timerMux);
 
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
     #ifdef GPIO_DEBUG
     digitalWrite(DEBUG_PIN_TIMER, debugPinVal % 2);  debugPinVal++;
     #endif
@@ -226,7 +228,7 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
         if(_currentBit < 8)  { // 0..7 bits data
             _lnCurrentRxByte >>= 1;
             uint8_t v = digitalRead(_rxPin);
-            if(v == LOCONET_RX_HIGH)  {
+            if(v == VAL_RX_HIGH)  {
                 _lnCurrentRxByte |= 0x80;
             } 
             //DEBUG_ISR("n=%d, v=%d", _currentBit, v);
@@ -241,15 +243,13 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
             /* The rx pin should not be low at stop bit,
              * if it is then an error has occured on the
              * bus. */
-            if(digitalRead(_rxPin) == LOCONET_RX_LOW)  {
+            if(digitalRead(_rxPin) == VAL_RX_LOW)  {
                 getRxStats()->rxErrors ++;
                 _lnCurrentRxByte = 0;
                 DEBUG_ISR("Collision");
             } else {
                 /* Send of the received byte for processing */
-                BaseType_t xHigherPriorityTaskWoken = pdFALSE;
                 xQueueSendToBackFromISR(_rxQueue, &_lnCurrentRxByte, &xHigherPriorityTaskWoken);
-                if(xHigherPriorityTaskWoken==pdTRUE) portYIELD_FROM_ISR();
             }
 
             #ifdef GPIO_DEBUG
@@ -266,21 +266,19 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
         
     case LN_ST_TX:   { // here _currentBit is what bit should be sent this time.
 
-        //DEBUG("bit %d, rx: %d / tx: %d", _currentBit, digitalRead(_rxPin), digitalRead(_txPin)==LOCONET_TX_HIGH);
-        if( ( (_currentBit!=0) && checkCollision()) || ( (_currentBit==0) && (digitalRead(_rxPin)==LOCONET_RX_LOW) ))  {
-            //DEBUG("rx: %d collides tx: %d", digitalRead(_rxPin), digitalRead(_txPin)==LOCONET_TX_HIGH );
+        //DEBUG("bit %d, rx: %d / tx: %d", _currentBit, digitalRead(_rxPin), digitalRead(_txPin)==VAL_TX_HIGH);
+        if( ( (_currentBit!=0) && checkCollision()) 
+         || ( (_currentBit==0) && (digitalRead(_rxPin)==VAL_RX_LOW) ))  {
+            //DEBUG("rx: %d collides tx: %d", digitalRead(_rxPin), digitalRead(_txPin)==VAL_TX_HIGH );
             changeState(LN_ST_TX_COLLISION, Lock::LOCK_FROM_ISR);
             getTxStats()->collisions++;
         } else if(_currentBit == 0) {
 
             if (uxQueueMessagesWaitingFromISR(_txQueue)) {
-                BaseType_t xHigherPriorityTaskWoken = pdFALSE;
                 xQueueReceiveFromISR(_txQueue, &_lnCurrentTxByte, &xHigherPriorityTaskWoken);
-                if(xHigherPriorityTaskWoken==pdTRUE) portYIELD_FROM_ISR();
-                
                 //DEBUG("txing byte 0x%02x", _lnCurrentTxByte);
 
-                digitalWrite(_txPin, LOCONET_TX_LOW); // start bit
+                digitalWrite(_txPin, VAL_TX_LOW); // start bit
 
                 portENTER_CRITICAL(&_timerMux);
                 _currentBit++;
@@ -292,14 +290,14 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
             }
             
         } else if(_currentBit <= 8)  {
-            digitalWrite(_txPin, (_lnCurrentTxByte & 0x01) ? LOCONET_TX_HIGH : LOCONET_TX_LOW );
+            digitalWrite(_txPin, (_lnCurrentTxByte & 0x01) ? VAL_TX_HIGH : VAL_TX_LOW );
             //DEBUG("txing bit %d", _lnCurrentTxByte & 0x01);
             /* Get the next bit to transmit */
             _lnCurrentTxByte >>= 1;
             _currentBit++;
         } else if(_currentBit == 9) {
             /* end o'clock  - send the stop bit*/
-            digitalWrite(_txPin, LOCONET_TX_HIGH);
+            digitalWrite(_txPin, VAL_TX_HIGH);
             _currentBit = 0; // next step - either send another start bit or start backoff
         } 
         break;
@@ -317,12 +315,12 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
     }
     case LN_ST_TX_COLLISION: {
         /* Pull the TX Line low to indicate Collision */
-        digitalWrite(_txPin, LOCONET_TX_LOW);
+        digitalWrite(_txPin, VAL_TX_LOW);
 
         portENTER_CRITICAL(&_timerMux);
 
         if(_currentBit == LN_COLLISION_TICKS) {
-            digitalWrite(_txPin, LOCONET_TX_HIGH);
+            digitalWrite(_txPin, VAL_TX_HIGH);
             changeState(LN_ST_CD_BACKOFF, Lock::NO_LOCK);
         } else _currentBit++;
         
@@ -333,12 +331,14 @@ void IRAM_ATTR LocoNetESP32::loconetBitTimer() {
 
     }
 
+    if(xHigherPriorityTaskWoken==pdTRUE) portYIELD_FROM_ISR();
+
 }
 
 /**
  * Waits for rx byte from _rxQueue and processes it. Loops infinitely.
  */
-void LocoNetESP32::rxByte() {
+void LocoNetESP32::rxByteTaskFunc() {
 
     const TickType_t xMaxBlockTime = pdMS_TO_TICKS(200);
 
@@ -366,13 +366,13 @@ void LocoNetESP32::rxByte() {
  *
  * Checks if there is a collision on the Loconet bus,
  * This happens when the value we put into the tx
- * register does not match that in the RX Register.
+ * pin does not match what is in the RX pin.
  *
  * @return true if there was a collision, false otherwise
  */
 bool LocoNetESP32::checkCollision() {
     
-    if ( (int)LOCONET_RX_HIGH != (int)LOCONET_TX_HIGH) {
+    if ( (int)VAL_RX_HIGH != (int)VAL_TX_HIGH) {
         return ((digitalRead(_rxPin) & 0x1) == (digitalRead(_txPin) & 0x1));
     } else {
         return ((digitalRead(_rxPin) & 0x1) != (digitalRead(_txPin) & 0x1));
