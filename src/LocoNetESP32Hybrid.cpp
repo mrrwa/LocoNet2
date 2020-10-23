@@ -43,7 +43,7 @@ void taskEntryPoint(void *param) {
 LocoNetESP32Hybrid::LocoNetESP32Hybrid(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 
 		bool invertedRx, bool invertedTx, const int timerId, const BaseType_t preferedCore
 		) :
-	LocoNetBackend(bus), _rxPin(rxPin), _txPin(txPin), _invertedRx(invertedRx), _invertedTx(invertedTx), 
+	LocoNetPhy(bus), _rxPin(rxPin), _txPin(txPin), _invertedRx(invertedRx), _invertedTx(invertedTx), 
 	_preferedCore(preferedCore), TX_HIGH_VAL(invertedTx?LOW:HIGH), RX_HIGH_VAL(invertedRx?LOW:HIGH), _state(IDLE), _timerId(timerId)
 {
 	_inst = this;

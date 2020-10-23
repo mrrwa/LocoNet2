@@ -41,7 +41,7 @@
 #include <esp32-hal-timer.h>
 
 
-class LocoNetESP32: public LocoNetBackend
+class LocoNetESP32: public LocoNetPhy
 {
     public:
         LocoNetESP32(LocoNetBus *bus, uint8_t rxPin=16, uint8_t txPin=15, uint8_t timerId=0);

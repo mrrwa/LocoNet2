@@ -42,7 +42,7 @@ void IRAM_ATTR locoNetStartBitCallback() {
 }
 
 LocoNetESP32::LocoNetESP32(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t timerId) 
-    : LocoNetBackend(bus), _rxPin(rxPin), _txPin(txPin), _timerId(timerId) 
+    : LocoNetPhy(bus), _rxPin(rxPin), _txPin(txPin), _timerId(timerId) 
 {
     // stash away a pointer to this instance for callback functions
     locoNetInstance = this;
@@ -385,7 +385,7 @@ bool LocoNetESP32::checkCollision() {
  *
  * Attempts to send a loconet packet.
  *
- * @param txData - a pointer to an lnMsg packet to transmit
+ * @param txData - a pointer to an LnMsg packet to transmit
  * @param ucPrioDelay - the delay to add to wait for the bus
  *                      to remain clear before transmission
  * @return LN_STATUS - the current status of the Loconet

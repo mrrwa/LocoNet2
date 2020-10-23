@@ -42,7 +42,7 @@
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
 
-class LocoNetESP32Hybrid: public LocoNetBackend {
+class LocoNetESP32Hybrid: public LocoNetPhy {
 	public:
 		
 		LocoNetESP32Hybrid(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin, uint8_t uartNum, 

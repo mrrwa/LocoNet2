@@ -77,23 +77,23 @@ const char * LoconetStatusStrings[] = {
 	"Retry Error"
 };
 
-LocoNetBackend::LocoNetBackend(LocoNetBus * bus) : bus(bus) {
+LocoNetPhy::LocoNetPhy(LocoNetBus * bus) : bus(bus) {
   bus->addConsumer(this);
 }
 
-bool LocoNetBackend::begin() {
+bool LocoNetPhy::begin() {
   return true;
 }
 
-void LocoNetBackend::end() {
+void LocoNetPhy::end() {
 }
 
-LN_STATUS LocoNetBackend::onMessage(const lnMsg& msg) {
-  lnMsg copy = msg;
+LN_STATUS LocoNetPhy::onMessage(const LnMsg& msg) {
+  LnMsg copy = msg;
   return send(&copy);
 }
 
-const char* LocoNetBackend::getStatusStr(LN_STATUS Status) {
+const char* LocoNetPhy::getStatusStr(LN_STATUS Status) {
   if ((Status >= LN_CD_BACKOFF) && (Status <= LN_RETRY_ERROR)) {
     return LoconetStatusStrings[Status];
   }
@@ -101,7 +101,7 @@ const char* LocoNetBackend::getStatusStr(LN_STATUS Status) {
   return "Invalid Status";
 }
 
-LN_STATUS LocoNetBackend::send(lnMsg *pPacket, uint8_t ucPrioDelay) {
+LN_STATUS LocoNetPhy::send(LnMsg *pPacket, uint8_t ucPrioDelay) {
   LN_STATUS enReturn;
   bool ucWaitForEnterBackoff;
 
@@ -158,21 +158,21 @@ LN_STATUS LocoNetBackend::send(lnMsg *pPacket, uint8_t ucPrioDelay) {
   return LN_RETRY_ERROR;
 }
 
-LN_STATUS LocoNetBackend::send(lnMsg *pPacket) {
+LN_STATUS LocoNetPhy::send(LnMsg *pPacket) {
   return send(pPacket, LN_BACKOFF_INITIAL);
 }
 
 
-LnRxStats* LocoNetBackend::getRxStats() {
+LnRxStats* LocoNetPhy::getRxStats() {
   return &rxBuffer.stats;
 }
 
-LnTxStats* LocoNetBackend::getTxStats() {
+LnTxStats* LocoNetPhy::getTxStats() {
   return &txStats;
 }
 
-void LocoNetBackend::consume(uint8_t newByte) {
-	lnMsg * rxPacket = rxBuffer.addByte(newByte);
+void LocoNetPhy::consume(uint8_t newByte) {
+	LnMsg * rxPacket = rxBuffer.addByte(newByte);
   
 	if (rxPacket != nullptr) {
     bus->broadcast(*rxPacket, this);
@@ -184,8 +184,8 @@ void LocoNetBackend::consume(uint8_t newByte) {
 
 
 
-lnMsg makeMsg(uint8_t OpCode, uint8_t Data1, uint8_t Data2) {
-  lnMsg SendPacket;
+LnMsg makeMsg(uint8_t OpCode, uint8_t Data1, uint8_t Data2) {
+  LnMsg SendPacket;
 
   SendPacket.data[0] = OpCode;
   SendPacket.data[1] = Data1;
@@ -196,7 +196,7 @@ lnMsg makeMsg(uint8_t OpCode, uint8_t Data1, uint8_t Data2) {
 
 
 LN_STATUS reportPower(LocoNetBus *ln, bool state) {
-  lnMsg SendPacket;
+  LnMsg SendPacket;
 
   if (state) {
     SendPacket.data[ 0 ] = OPC_GPON;
@@ -252,22 +252,22 @@ LocoNetDispatcher::LocoNetDispatcher(LocoNetBus *ln): ln(ln) {
   ln->addConsumer(this);
 }
 
-LN_STATUS LocoNetDispatcher::onMessage(const lnMsg& msg) {
+LN_STATUS LocoNetDispatcher::onMessage(const LnMsg& msg) {
   processPacket(&msg);
   return LN_DONE;
 }
 
-LN_STATUS LocoNetDispatcher::send(lnMsg *txPacket) {
+LN_STATUS LocoNetDispatcher::send(LnMsg *txPacket) {
   return ln->broadcast(*txPacket);
 }
 
 LN_STATUS LocoNetDispatcher::send(uint8_t opCode, uint8_t data1, uint8_t data2) {
-  lnMsg tx = makeMsg( opCode, data1, data2);
+  LnMsg tx = makeMsg( opCode, data1, data2);
   return send( &tx );
 }
 
 
-void LocoNetDispatcher::processPacket(const lnMsg *packet) {
+void LocoNetDispatcher::processPacket(const LnMsg *packet) {
 
     if(callbacks.find(CALLBACK_FOR_ALL_OPCODES) != callbacks.end()) {
       for(const auto &cb : callbacks[CALLBACK_FOR_ALL_OPCODES]) {
@@ -288,7 +288,7 @@ void LocoNetDispatcher::processPacket(const lnMsg *packet) {
 
 }
 
-void LocoNetDispatcher::onPacket(uint8_t opCode, std::function<void(const lnMsg *)> callback) {
+void LocoNetDispatcher::onPacket(uint8_t opCode, std::function<void(const LnMsg *)> callback) {
 
   callbacks[opCode].push_back(callback);
   DEBUG("registering callback function for OpCode: %02x, %d callbacks for this OpCode.", 
@@ -296,7 +296,7 @@ void LocoNetDispatcher::onPacket(uint8_t opCode, std::function<void(const lnMsg 
 }
 
 void LocoNetDispatcher::onSensorChange(std::function<void(uint16_t, bool)> callback) {
-  onPacket(OPC_INPUT_REP, [callback](const lnMsg *packet) {
+  onPacket(OPC_INPUT_REP, [callback](const LnMsg *packet) {
     uint16_t address = (packet->srq.sw1 | ((packet->srq.sw2 & 0x0F ) << 7));
     address <<= 1;
     address += (packet->ir.in2 & OPC_INPUT_REP_SW) ? 2 : 1;
@@ -306,7 +306,7 @@ void LocoNetDispatcher::onSensorChange(std::function<void(uint16_t, bool)> callb
 }
 
 void LocoNetDispatcher::onSwitchRequest(std::function<void(uint16_t, bool, bool)> callback) {
-  onPacket(OPC_SW_REQ, [callback](const lnMsg *packet) {
+  onPacket(OPC_SW_REQ, [callback](const LnMsg *packet) {
     uint16_t address = (packet->srq.sw1 | ((packet->srq.sw2 & 0x0F ) << 7)) + 1;
     DEBUG("Switch Request addr:%d, out:%d, dir:%d", address, packet->srq.sw2 & OPC_SW_REQ_OUT, packet->srq.sw2 & OPC_SW_REQ_DIR);
     callback(address, packet->srq.sw2 & OPC_SW_REQ_OUT, packet->srq.sw2 & OPC_SW_REQ_DIR);
@@ -314,7 +314,7 @@ void LocoNetDispatcher::onSwitchRequest(std::function<void(uint16_t, bool, bool)
 }
 
 void LocoNetDispatcher::onSwitchReport(std::function<void(uint16_t, bool, bool)> callback) {
-  onPacket(OPC_SW_REP, [callback](const lnMsg *packet) {
+  onPacket(OPC_SW_REP, [callback](const LnMsg *packet) {
     uint16_t address = (packet->srq.sw1 | ((packet->srq.sw2 & 0x0F ) << 7)) + 1;
     DEBUG("Switch Report addr:%d, out:%d, dir:%d", address, packet->srq.sw2 & OPC_SW_REP_HI, packet->srq.sw2 & OPC_SW_REP_SW);
     callback(address, packet->srq.sw2 & OPC_SW_REP_HI, packet->srq.sw2 & OPC_SW_REP_SW);
@@ -322,7 +322,7 @@ void LocoNetDispatcher::onSwitchReport(std::function<void(uint16_t, bool, bool)>
 }
 
 void LocoNetDispatcher::onSwitchState(std::function<void(uint16_t, bool, bool)> callback) {
-  onPacket(OPC_SW_STATE, [callback](const lnMsg *packet) {
+  onPacket(OPC_SW_STATE, [callback](const LnMsg *packet) {
     uint16_t address = (packet->srq.sw1 | ((packet->srq.sw2 & 0x0F ) << 7)) + 1;
     DEBUG("Switch State addr:%d, out:%d, dir:%d", address, packet->srq.sw2 & OPC_SW_REQ_OUT, packet->srq.sw2 & OPC_SW_REQ_DIR);
     callback(address, packet->srq.sw2 & OPC_SW_REQ_OUT, packet->srq.sw2 & OPC_SW_REQ_DIR);
@@ -330,18 +330,18 @@ void LocoNetDispatcher::onSwitchState(std::function<void(uint16_t, bool, bool)> 
 }
 
 void LocoNetDispatcher::onPowerChange(std::function<void(bool)> callback) {
-  onPacket(OPC_GPON, [callback](const lnMsg *packet) {
+  onPacket(OPC_GPON, [callback](const LnMsg *packet) {
     DEBUG("Power ON");
     callback(true);
   });
-  onPacket(OPC_GPON, [callback](const lnMsg *packet) {
+  onPacket(OPC_GPON, [callback](const LnMsg *packet) {
     DEBUG("Power OFF");
     callback(false);
   });
 }
 
 void LocoNetDispatcher::onMultiSenseDeviceInfo(std::function<void(uint8_t, uint8_t, bool, bool)> callback) {
-  onPacket(OPC_MULTI_SENSE, [callback](const lnMsg *packet) {
+  onPacket(OPC_MULTI_SENSE, [callback](const LnMsg *packet) {
     if((packet->data[1] & OPC_MULTI_SENSE_MSG) == OPC_MULTI_SENSE_DEVICE_INFO &&
       ((packet->msdi.arg3 & 0xF0) == 0x30 || (packet->msdi.arg3 & 0xF0) == 0x10)) {
       uint8_t mask = 1;
@@ -355,7 +355,7 @@ void LocoNetDispatcher::onMultiSenseDeviceInfo(std::function<void(uint8_t, uint8
 }
 
 void LocoNetDispatcher::onMultiSenseTransponder(std::function<void(uint16_t, uint8_t, uint16_t, bool)> callback) {
-  onPacket(OPC_MULTI_SENSE, [callback](const lnMsg *packet) {
+  onPacket(OPC_MULTI_SENSE, [callback](const LnMsg *packet) {
     if((packet->data[1] & OPC_MULTI_SENSE_MSG) == OPC_MULTI_SENSE_ABSENT ||
        (packet->data[1] & OPC_MULTI_SENSE_MSG) == OPC_MULTI_SENSE_PRESENT) {
       callback(OPC_MULTI_SENSE_BOARD_ADDRESS(packet->mstr.zone, packet->mstr.type),
@@ -367,8 +367,8 @@ void LocoNetDispatcher::onMultiSenseTransponder(std::function<void(uint16_t, uin
 }
 
 
-lnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack) {
-  lnMsg lack;
+LnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack) {
+  LnMsg lack;
   lack.lack.opcode = OPC_LONG_ACK;
   lack.lack.command = replyToOpc;
   lack.lack.ack1 = ack;

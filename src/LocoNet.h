@@ -97,9 +97,9 @@ typedef enum
 } LN_STATUS;
 
 
-using LocoNetBus = Bus<lnMsg, LN_STATUS, LN_STATUS::LN_DONE, 10>;
+using LocoNetBus = Bus<LnMsg, LN_STATUS, LN_STATUS::LN_DONE, 10>;
 
-using LocoNetConsumer = Consumer<lnMsg, LN_STATUS>;
+using LocoNetConsumer = Consumer<LnMsg, LN_STATUS>;
 
 // CD Backoff starts after the Stop Bit (Bit 9) and has a minimum or 20 Bit Times
 // but initially starts with an additional 20 Bit Times
@@ -135,7 +135,7 @@ constexpr uint8_t LN_COLLISION_TICKS    = 15; //< after collision the bus will b
 
 constexpr uint8_t CALLBACK_FOR_ALL_OPCODES=0xFF;
 
-inline uint8_t lnPacketSize(const lnMsg * msg) {
+inline uint8_t lnPacketSize(const LnMsg * msg) {
     return LOCONET_PACKET_SIZE(msg->sz.command, msg->sz.mesg_size);
 }
 
@@ -143,20 +143,20 @@ inline uint8_t lnPacketSize(const lnMsg * msg) {
 
 #define MAX_BACKEND_CONSUMERS  10
 
-class LocoNetBackend: public LocoNetConsumer {
+class LocoNetPhy: public LocoNetConsumer {
     public:
-        LocoNetBackend(LocoNetBus * bus);
+        LocoNetPhy(LocoNetBus * bus);
         virtual bool begin();
         virtual void end();
-        LN_STATUS send(lnMsg *TxPacket);
-        LN_STATUS send(lnMsg *TxPacket, uint8_t PrioDelay);
+        LN_STATUS send(LnMsg *txPacket);
+        LN_STATUS send(LnMsg *txPacket, uint8_t PrioDelay);
 
         LnRxStats* getRxStats(void);
         LnTxStats* getTxStats(void);
 
-        const char* getStatusStr(LN_STATUS Status);
+        const char* getStatusStr(LN_STATUS status);
     
-        LN_STATUS onMessage(const lnMsg& msg);
+        LN_STATUS onMessage(const LnMsg& msg);
 
     protected:
         void consume(uint8_t newByte);
@@ -169,9 +169,9 @@ class LocoNetBackend: public LocoNetConsumer {
 
 };
 
-lnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack);
+LnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack);
 
-lnMsg makeMsg(uint8_t OpCode, uint8_t Data1, uint8_t Data2);
+LnMsg makeMsg(uint8_t OpCode, uint8_t Data1, uint8_t Data2);
 
 LN_STATUS requestSwitch(LocoNetBus *ln, uint16_t Address, uint8_t Output, uint8_t Direction);
 LN_STATUS reportSwitch(LocoNetBus *ln, uint16_t Address);
@@ -184,16 +184,16 @@ class LocoNetDispatcher : public LocoNetConsumer {
         void begin() {}
         void end() {}
 
-        LN_STATUS send(lnMsg *txPacket);
-        //LN_STATUS send(lnMsg *TxPacket, uint8_t PrioDelay);
+        LN_STATUS send(LnMsg *txPacket);
+        //LN_STATUS send(LnMsg *TxPacket, uint8_t PrioDelay);
         LN_STATUS send(uint8_t opCode, uint8_t data1, uint8_t data2);
         //LN_STATUS send(uint8_t OpCode, uint8_t Data1, uint8_t Data2, uint8_t PrioDelay);
         
-        LN_STATUS onMessage(const lnMsg& msg);
+        LN_STATUS onMessage(const LnMsg& msg);
 
-        void processPacket(const lnMsg *packet);
+        void processPacket(const LnMsg *packet);
 
-        void onPacket(uint8_t opCode, std::function<void(const lnMsg *)> callback);
+        void onPacket(uint8_t opCode, std::function<void(const LnMsg *)> callback);
         /**
          * Registers a callback for when a sensor changes state
          *                                     address   state
@@ -237,8 +237,8 @@ class LocoNetDispatcher : public LocoNetConsumer {
 
     private:
         LocoNetBus * ln;
-        bool processSwitchSensorMessage(lnMsg *lnPacket);
-        std::map<uint8_t, std::vector<std::function<void(const lnMsg *)> > > callbacks;
+        bool processSwitchSensorMessage(LnMsg *lnPacket);
+        std::map<uint8_t, std::vector<std::function<void(const LnMsg *)> > > callbacks;
 };
 
 using LocoNet = LocoNetDispatcher;
