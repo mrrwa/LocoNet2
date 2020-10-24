@@ -74,7 +74,7 @@
 #include "LocoNetMessageBuffer.h"
 #include "Bus.h"
 
-#define DEBUG_OUTPUT
+#define DEBUG_OUTPUT_
 
 #ifdef DEBUG_OUTPUT
 #include <cstdio>
