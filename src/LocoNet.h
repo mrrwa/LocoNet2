@@ -173,6 +173,8 @@ LnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack);
 
 LnMsg makeMsg(uint8_t OpCode, uint8_t Data1, uint8_t Data2);
 
+LnMsg makeSwRec(uint16_t address, bool output, bool thrown);
+
 LN_STATUS requestSwitch(LocoNetBus *ln, uint16_t Address, uint8_t Output, uint8_t Direction);
 LN_STATUS reportSwitch(LocoNetBus *ln, uint16_t Address);
 LN_STATUS reportSensor(LocoNetBus *ln, uint16_t Address, uint8_t State);

@@ -208,19 +208,25 @@ LN_STATUS reportPower(LocoNetBus *ln, bool state) {
 }
 
 
-LN_STATUS requestSwitch(LocoNetBus *ln, uint16_t Address, uint8_t Output, uint8_t Direction) {
-  uint8_t AddrH = (--Address >> 7) & 0x0F;
-  uint8_t AddrL = Address & 0x7F;
+LnMsg makeSwRec(uint16_t address, bool output, bool thrown) {
+  address--;
+  uint8_t addrH = (address >> 7) & 0x0F;
+  uint8_t addrL = address & 0x7F;
 
-  if (Output) {
-    AddrH |= OPC_SW_REQ_OUT;
+  if (output) {
+    addrH |= OPC_SW_REQ_OUT;
   }
 
-  if (Direction) {
-    AddrH |= OPC_SW_REQ_DIR;
+  if (!thrown) {
+    addrH |= OPC_SW_REQ_DIR;
   }
 
-  return ln->broadcast( makeMsg(OPC_SW_REQ, AddrL, AddrH) );
+  return makeMsg(OPC_SW_REQ, addrL, addrH);
+}
+
+
+LN_STATUS requestSwitch(LocoNetBus *ln, uint16_t address, uint8_t output, uint8_t direction) {
+  return ln->broadcast( makeSwRec(address, output==1, direction==0) );
 }
 
 LN_STATUS reportSwitch(LocoNetBus *ln, uint16_t Address) {
