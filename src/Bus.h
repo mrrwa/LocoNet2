@@ -10,7 +10,7 @@
 
 #include "ln_opc.h"
 
-#define BUS_DEBUG
+#define BUS_DEBUG_
 
 #ifdef BUS_DEBUG
 #include <Arduino.h>

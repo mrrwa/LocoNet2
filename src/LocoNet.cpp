@@ -64,6 +64,7 @@
  *****************************************************************************/
 
 #include <string.h>
+#include <stdio.h>
 
 #include "LocoNet.h"
 
@@ -130,6 +131,7 @@ LN_STATUS LocoNetPhy::send(LnMsg *pPacket, uint8_t ucPrioDelay) {
   int _l = strlen(_msg);
   for(uint8_t i=0; i<packetLen; i++)
     _l += sprintf(_msg+_l, " %02x", pPacket->data[i]);  
+    // use formatMsg for that
   DEBUG("%s", _msg);
 #endif
   
@@ -382,8 +384,18 @@ void LocoNetDispatcher::onMultiSenseTransponder(std::function<void(uint16_t, uin
 LnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack) {
   LnMsg lack;
   lack.lack.command = OPC_LONG_ACK;
-  lack.lack.opcode = replyToOpc & B01111111;
+  lack.lack.opcode = replyToOpc & 0x7F;
   lack.lack.ack1 = ack;
   writeChecksum(lack);
   return lack;
+}
+
+size_t formatMsg(const LnMsg & msg, char* dst, size_t len) {
+  size_t t = 0;
+  uint8_t ln = msg.length();
+  for(int j=0; j<ln; j++) {
+      t += snprintf(dst+t, len-t, "%02X ", msg.data[j]);
+      if(t>=len) return len-1;
+  }
+  return t;
 }

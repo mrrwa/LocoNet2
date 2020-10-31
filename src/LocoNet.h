@@ -177,6 +177,8 @@ LnMsg makeSwRec(uint16_t address, bool output, bool thrown);
 
 uint8_t writeChecksum(LnMsg &msg);
 
+size_t formatMsg(const LnMsg &, char* dst, size_t len);
+
 LN_STATUS requestSwitch(LocoNetBus *ln, uint16_t Address, uint8_t Output, uint8_t Direction);
 LN_STATUS reportSwitch(LocoNetBus *ln, uint16_t Address);
 LN_STATUS reportSensor(LocoNetBus *ln, uint16_t Address, uint8_t State);
