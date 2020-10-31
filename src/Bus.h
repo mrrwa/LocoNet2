@@ -10,11 +10,11 @@
 
 #include "ln_opc.h"
 
-#define BUS_DEBUG_
+#define BUS_DEBUG
 
 #ifdef BUS_DEBUG
 #include <Arduino.h>
-#define BUS_DEBUGF(...)  { Serial.printf(__VA_ARGS__); }
+#define BUS_DEBUGF(format, ...)  do{ log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__); }while(0)
 #else
 #define BUS_DEBUGF(...)
 #endif
@@ -32,7 +32,7 @@ public:
 
     Ret broadcast(const Msg &msg, MsgConsumer* sender = nullptr) {
         
-        BUS_DEBUGF("broadcasting message\n");
+        BUS_DEBUGF("message %02x %02x...", msg.data[0], msg.data[1]);
 
         Ret ret = okVal;
         for(const auto & c: consumers) {

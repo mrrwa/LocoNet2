@@ -101,6 +101,16 @@ const char* LocoNetPhy::getStatusStr(LN_STATUS Status) {
   return "Invalid Status";
 }
 
+uint8_t writeChecksum(LnMsg &msg) {
+  uint8_t len = msg.length();
+  uint8_t ck = 0xFF;
+  for(uint8_t index = 0; index < len - 1; index++) {
+    ck ^= msg.data[index];
+  }
+  msg.data[len - 1] = ck;
+  return ck;
+}
+
 LN_STATUS LocoNetPhy::send(LnMsg *pPacket, uint8_t ucPrioDelay) {
   LN_STATUS enReturn;
   bool ucWaitForEnterBackoff;
@@ -111,13 +121,9 @@ LN_STATUS LocoNetPhy::send(LnMsg *pPacket, uint8_t ucPrioDelay) {
   }
 
   /* First calculate the checksum as it may not have been done */
-  uint8_t *packet = reinterpret_cast<uint8_t *>(pPacket);
-  uint8_t packetLen = lnPacketSize(pPacket);
-  uint8_t packetChecksum = 0xFF;
-  for(uint8_t index = 0; index < packetLen - 1; index++) {
-    packetChecksum ^= packet[index];
-  }
-  packet[packetLen - 1] = packetChecksum;
+  uint8_t packetLen = pPacket->length();
+  writeChecksum(*pPacket);
+ 
 
 #ifdef DEBUG_OUTPUT
   char _msg[100] = "LoconetPacket";
@@ -133,7 +139,7 @@ LN_STATUS LocoNetPhy::send(LnMsg *pPacket, uint8_t ucPrioDelay) {
     ucWaitForEnterBackoff = true;
     do {
       //DEBUG("calling sendLocoNetPacketTry(%p, %d, %d) attempt %d", packet, packetLen, ucPrioDelay, ucTry);
-      enReturn = sendLocoNetPacketTry(packet, packetLen, ucPrioDelay);
+      enReturn = sendLocoNetPacketTry(pPacket->data, packetLen, ucPrioDelay);
       DEBUG("attempt %d, sendLocoNetPacketTry(%p, len=%d, priority=%d)=%s", 
           ucTry, packet, packetLen, ucPrioDelay,
           enReturn==LN_CD_BACKOFF?"LN_CD_BACKOFF" : enReturn==LN_PRIO_BACKOFF?"LN_PRIO_BACKOFF" : enReturn==LN_NETWORK_BUSY?"LN_NETWORK_BUSY": enReturn==LN_DONE?"LN_DONE": enReturn==LN_COLLISION?"LN_COLLISION": enReturn==LN_UNKNOWN_ERROR?"LN_UNKNOWN_ERROR":"LN_RETRY_ERROR"); 
@@ -375,8 +381,9 @@ void LocoNetDispatcher::onMultiSenseTransponder(std::function<void(uint16_t, uin
 
 LnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack) {
   LnMsg lack;
-  lack.lack.opcode = OPC_LONG_ACK;
-  lack.lack.command = replyToOpc;
+  lack.lack.command = OPC_LONG_ACK;
+  lack.lack.opcode = replyToOpc & B01111111;
   lack.lack.ack1 = ack;
+  writeChecksum(lack);
   return lack;
 }
