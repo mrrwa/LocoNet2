@@ -249,6 +249,8 @@ class LocoNetDispatcher : public LocoNetConsumer {
 
 using LocoNet = LocoNetDispatcher;
 
+const char* fmtOpcode(uint8_t opcode);
+
 /************************************************************************************
  Call-back functions
  ************************************************************************************/

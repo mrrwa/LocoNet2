@@ -396,10 +396,44 @@ LnMsg makeLongAck(uint8_t replyToOpc, uint8_t ack) {
   return lack;
 }
 
+const char * fmtOpcode(uint8_t opc) {
+  switch(opc) {
+    case  OPC_BUSY: return "BUSY";
+    case  OPC_GPOFF: return "GPOFF";
+    case  OPC_GPON: return "GPON";
+    case  OPC_IDLE: return "IDLE";
+    case  OPC_LOCO_SPD: return "LOCO_SPD";
+    case  OPC_LOCO_DIRF: return "LOCO_DIRF";
+    case  OPC_LOCO_SND: return "LOCO_SND";
+    case  OPC_SW_REQ: return "SW_REQ";
+    case  OPC_SW_REP: return "SW_REP";
+    case  OPC_INPUT_REP: return "INPUT_REP";
+    case  OPC_UNKNOWN: return "UNKNOWN";
+    case  OPC_LONG_ACK: return "LONG_ACK";
+    case  OPC_SLOT_STAT1: return "SLOT_STAT1";
+    case  OPC_CONSIST_FUNC: return "CONSIST_FUNC";
+    case  OPC_UNLINK_SLOTS: return "UNLINK_SLOTS";
+    case  OPC_LINK_SLOTS: return "LINK_SLOTS";
+    case  OPC_MOVE_SLOTS: return "MOVE_SLOTS";
+    case  OPC_RQ_SL_DATA: return "RQ_SL_DATA";
+    case  OPC_SW_STATE: return "SW_STATE";
+    case  OPC_SW_ACK: return "SW_ACK";
+    case  OPC_LOCO_ADR: return "LOCO_ADR";
+    case  OPC_MULTI_SENSE: return "MULTI_SENSE";
+    case  OPC_PEER_XFER: return "PEER_XFER";
+    case  OPC_SL_RD_DATA: return "SL_RD_DATA";
+    case  OPC_IMM_PACKET: return "IMM_PACKET";
+    case  OPC_IMM_PACKET_2: return "IMM_PACKET_2";
+    case  OPC_WR_SL_DATA: return "WR_SL_DATA";
+    default: return "?";
+  }
+}
+
 size_t formatMsg(const LnMsg & msg, char* dst, size_t len) {
   size_t t = 0;
   uint8_t ln = msg.length();
-  for(int j=0; j<ln; j++) {
+  t += snprintf(dst, len, "%s(%02X) ", fmtOpcode(msg.data[0]), msg.data[0] );
+  for(int j=1; j<ln; j++) {
       t += snprintf(dst+t, len-t, "%02X ", msg.data[j]);
       if(t>=len) return len-1;
   }
