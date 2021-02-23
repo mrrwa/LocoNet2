@@ -121,9 +121,11 @@ LN_STATUS LocoNetPhy::send(LnMsg *pPacket, uint8_t ucPrioDelay) {
       ucPrioDelay = LN_BACKOFF_MAX;
   }
 
-  /* First calculate the checksum as it may not have been done */
   uint8_t packetLen = pPacket->length();
-  writeChecksum(*pPacket);
+
+  ///* First calculate the checksum as it may not have been done */
+  // this is not in Bus.broadcast
+  //writeChecksum(*pPacket);
  
 
 #ifdef DEBUG_OUTPUT
@@ -199,6 +201,8 @@ LnMsg makeMsg(uint8_t OpCode, uint8_t Data1, uint8_t Data2) {
   SendPacket.data[1] = Data1;
   SendPacket.data[2] = Data2;
 
+  writeChecksum(SendPacket);
+
   return SendPacket;
 }
 
@@ -212,6 +216,7 @@ LN_STATUS reportPower(LocoNetBus *ln, bool state) {
     SendPacket.data[ 0 ] = OPC_GPOFF;
   }
 
+  writeChecksum(SendPacket);
   return ln->broadcast( SendPacket ) ;
 }
 
@@ -272,12 +277,13 @@ LN_STATUS LocoNetDispatcher::onMessage(const LnMsg& msg) {
 }
 
 LN_STATUS LocoNetDispatcher::send(LnMsg *txPacket) {
+  writeChecksum(*txPacket);
   return ln->broadcast(*txPacket);
 }
 
 LN_STATUS LocoNetDispatcher::send(uint8_t opCode, uint8_t data1, uint8_t data2) {
   LnMsg tx = makeMsg( opCode, data1, data2);
-  return send( &tx );
+  return ln->broadcast( tx );
 }
 
 
