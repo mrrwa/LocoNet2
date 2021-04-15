@@ -327,8 +327,8 @@ LN_STATUS LocoNetClass::reportSwitch( uint16_t Address )
 
 LN_STATUS LocoNetClass::reportSensor( uint16_t Address, uint8_t State )
 {
-	byte AddrH = ( (--Address >> 8) & 0x0F ) | OPC_INPUT_REP_CB ;
-	byte AddrL = ( Address >> 1 ) & 0x7F ;
+	uint8_t AddrH = ( (--Address >> 8) & 0x0F ) | OPC_INPUT_REP_CB ;
+	uint8_t AddrL = ( Address >> 1 ) & 0x7F ;
 	if( Address % 2)
 		AddrH |= OPC_INPUT_REP_SW ;
 
@@ -1154,8 +1154,8 @@ uint16_t LocoNetSystemVariableClass::readSVNodeId(void)
 
 typedef union
 {
-word                   w;
-struct { byte lo,hi; } b;
+uint16_t                  w;
+struct { uint8_t lo,hi; } b;
 } U16_t;
 
 typedef union
@@ -1167,7 +1167,7 @@ struct
   U16_t unproductId;
   U16_t unSerialNumber;
 }    stDecoded;
-byte abPlain[8];
+uint8_t abPlain[8];
 } SV_Addr_t;
 
 void decodePeerData( peerXferMsg *pMsg, uint8_t *pOutData )
@@ -1490,7 +1490,7 @@ uint8_t LocoNetCVClass::processLNCVMessage(lnMsg * LnPacket) {
 	switch (LnPacket->sr.command) {
 	case OPC_IMM_PACKET:
 	case OPC_PEER_XFER:
-		Serial.println("Possibly a LNCV message.");
+		DEBUG("Possibly a LNCV message.\n");
 		// Either of these message types may be a LNCV message
 		// Sanity check: Message length, Verify addresses
 		if (LnPacket->ub.mesg_size == 15 && LnPacket->ub.DSTL == LNCV_MODULE_DSTL && LnPacket->ub.DSTH == LNCV_MODULE_DSTH) {
