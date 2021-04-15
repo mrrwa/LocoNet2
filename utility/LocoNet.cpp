@@ -1141,8 +1141,8 @@ bool LocoNetSystemVariableClass::CheckAddressRange(uint16_t startAddress, uint8_
 
 uint16_t LocoNetSystemVariableClass::writeSVNodeId(uint16_t newNodeId)
 {
-    writeSVStorage(SV_ADDR_NODE_ID_H, newNodeId >> (byte) 8);
-    writeSVStorage(SV_ADDR_NODE_ID_L, newNodeId & (byte) 0x00FF);
+    writeSVStorage(SV_ADDR_NODE_ID_H, newNodeId >> (uint8_t) 8);
+    writeSVStorage(SV_ADDR_NODE_ID_L, newNodeId & (uint8_t) 0x00FF);
 
     return readSVNodeId();
 }
@@ -1237,12 +1237,12 @@ SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
 {
  SV_Addr_t unData ;
 
-  if( ( LnPacket->sv.mesg_size != (byte) 0x10 ) ||
-      ( LnPacket->sv.command != (byte) OPC_PEER_XFER ) ||
-      ( LnPacket->sv.sv_type != (byte) 0x02 ) ||
-      ( LnPacket->sv.sv_cmd & (byte) 0x40 ) ||
-      ( ( LnPacket->sv.svx1 & (byte) 0xF0 ) != (byte) 0x10 ) ||
-      ( ( LnPacket->sv.svx2 & (byte) 0xF0 ) != (byte) 0x10 ) )
+  if( ( LnPacket->sv.mesg_size != (uint8_t) 0x10 ) ||
+      ( LnPacket->sv.command != (uint8_t) OPC_PEER_XFER ) ||
+      ( LnPacket->sv.sv_type != (uint8_t) 0x02 ) ||
+      ( LnPacket->sv.sv_cmd & (uint8_t) 0x40 ) ||
+      ( ( LnPacket->sv.svx1 & (uint8_t) 0xF0 ) != (uint8_t) 0x10 ) ||
+      ( ( LnPacket->sv.svx2 & (uint8_t) 0xF0 ) != (uint8_t) 0x10 ) )
     return SV_NOT_CONSUMED ;
 
   decodePeerData( &LnPacket->px, unData.abPlain ) ;
@@ -1379,13 +1379,13 @@ SV_STATUS LocoNetSystemVariableClass::doDeferredProcessing( void )
     lnMsg msg ;
     SV_Addr_t unData ;
 
-    msg.sv.command = (byte) OPC_PEER_XFER ;
-    msg.sv.mesg_size = (byte) 0x10 ;
+    msg.sv.command = (uint8_t) OPC_PEER_XFER ;
+    msg.sv.mesg_size = (uint8_t) 0x10 ;
     msg.sv.src = DeferredSrcAddr ;
-    msg.sv.sv_cmd = SV_DISCOVER | (byte) 0x40 ;
-    msg.sv.sv_type = (byte) 0x02 ;
-    msg.sv.svx1 = (byte) 0x10 ;
-    msg.sv.svx2 = (byte) 0x10 ;
+    msg.sv.sv_cmd = SV_DISCOVER | (uint8_t) 0x40 ;
+    msg.sv.sv_type = (uint8_t) 0x02 ;
+    msg.sv.svx1 = (uint8_t) 0x10 ;
+    msg.sv.svx2 = (uint8_t) 0x10 ;
 
     unData.stDecoded.unDestinationId.w            = readSVNodeId();
     unData.stDecoded.unMfgIdDevIdOrSvAddress.b.lo = mfgId;
