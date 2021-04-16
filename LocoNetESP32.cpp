@@ -477,3 +477,18 @@ LN_STATUS LocoNetESP32Class::sendLocoNetPacketTry(lnMsg *txData, unsigned char u
     }
     return LN_UNKNOWN_ERROR; // everything else is an error
 }
+
+void LocoNetESP32Class::debug(int32_t Data)
+{
+	Serial.print(Data);
+}	
+
+void LocoNetESP32Class::debug(const char* Data) 
+{
+	Serial.print(Data);
+}
+
+void LocoNetESP32Class::debug(uint32_t Data, uint8_t Base)
+{
+	Serial.print(Data, Base);
+}

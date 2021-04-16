@@ -58,6 +58,9 @@ class LocoNetUartClass: public LocoNetClass
 	public:
 		void init();
 		void process();
+		void debug(const char* Data) =0;
+		void debug(int32_t Data)=0;
+		void debug(uint32_t Data, uint8_t Base)=0;
 		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
 
 	

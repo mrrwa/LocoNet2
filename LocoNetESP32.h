@@ -73,7 +73,9 @@ class LocoNetESP32Class: public LocoNetClass
 
     public:
         void init();
-
+        void debug(const char* Data);
+        void debug(int32_t Data);
+        void debug(uint32_t Data, uint8_t Base);
         LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
         static void IRAM_ATTR loconetStartBit();
         static void IRAM_ATTR loconetBitTimer();
