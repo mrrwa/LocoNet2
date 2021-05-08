@@ -47,3 +47,18 @@ LN_STATUS LocoNetAvrIcpClass::sendLocoNetPacketTry(lnMsg *txData, unsigned char 
 
 	return LN_DONE;
 }
+
+void LocoNetAvrIcpClass::debug(int32_t Data)
+{
+	Serial.print(Data);
+}	
+
+void LocoNetAvrIcpClass::debug(const char* Data) 
+{
+	Serial.print(Data);
+}
+
+void LocoNetAvrIcpClass::debug(uint32_t Data, uint8_t Base)
+{
+	Serial.print(Data, Base);
+}

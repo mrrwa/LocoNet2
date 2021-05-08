@@ -43,6 +43,9 @@ class LocoNetAvrIcpClass: public LocoNetClass
 {
 	public:
 		void init(uint8_t txPin);
+		void debug(const char* Data);
+		void debug(int32_t Data);
+		void debug(uint32_t Data, uint8_t Base);
 		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
 };
 

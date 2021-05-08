@@ -65,14 +65,53 @@
 
 #include "LocoNet.h"
 
-#ifdef ESP32
+
+
+#if defined(AVR)
+#include <avr/eeprom.h>
+#include <avr/wdt.h>
+#elif defined(ESP32)
 #include "Arduino.h"
 #include "EEPROM.h"
 #include "esp_system.h"
+#elif (ARDUINO >= 100)
+#include "Arduino.h"
+#include "EEPROM.h"
 #else
-#include <avr/eeprom.h>
-#include <avr/wdt.h>
+// do nothing
 #endif
+
+
+
+
+
+//#define DEBUG_OUTPUT
+
+#ifdef DEBUG_OUTPUT
+#define DEBUG(x) debug(x)
+#define DEBUGHEX(x) debug(x, HEX)
+// These are used for debug number conversions, under Arduino , they 
+// will already be defined, but for other platfroms they might need
+// defining.
+#ifndef DEC
+#define DEC 10
+#endif
+#ifndef HEX
+#define HEX 16
+#endif
+#ifndef OCT
+#define OCT 8
+#endif
+#ifndef BIN
+#define BIN 2
+#endif
+#else //if !defined DEBUG_OUTPUT
+#define DEBUG(x)
+#define DEBUGHEX(x)
+#endif //#ifdef DEBUG_OUTPUT
+
+
+
 
 const char * LoconetStatusStrings[] = {
 	"CD Backoff",
@@ -1154,7 +1193,7 @@ uint16_t LocoNetSystemVariableClass::readSVNodeId(void)
 
 typedef union
 {
-uint16_t                  w;
+uint16_t w;
 struct { uint8_t lo,hi; } b;
 } U16_t;
 
@@ -1248,20 +1287,22 @@ SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
   decodePeerData( &LnPacket->px, unData.abPlain ) ;
 
 #ifdef DEBUG_SV
-    Serial.print("LNSV Src: ");
-    Serial.print(LnPacket->sv.src);
-    Serial.print("  Dest: ");
-    Serial.print(unData.stDecoded.unDestinationId.w);
-    Serial.print("  CMD: ");
-    Serial.println(LnPacket->sv.sv_cmd, HEX);
+    DEBUG("LNSV Src: ");
+    DEBUG(LnPacket->sv.src);
+    DEBUG("  Dest: ");
+    DEBUG(unData.stDecoded.unDestinationId.w);
+    DEBUG("  CMD: ");
+    DEBUGHEX(LnPacket->sv.sv_cmd);
+    DEBUG("\n");
 #endif
   if ((LnPacket->sv.sv_cmd != SV_DISCOVER) &&
       (LnPacket->sv.sv_cmd != SV_CHANGE_ADDRESS) &&
       (unData.stDecoded.unDestinationId.w != readSVNodeId()))
   {
 #ifdef DEBUG_SV
-    Serial.print("LNSV Dest Not Equal: ");
-    Serial.println(readSVNodeId());
+    DEBUG("LNSV Dest Not Equal: ");
+    DEBUG(readSVNodeId());
+    DEBUG("\n");
 #endif
     return SV_NOT_CONSUMED;
   }
@@ -1350,8 +1391,9 @@ SV_STATUS LocoNetSystemVariableClass::processMessage(lnMsg *LnPacket )
   LN_STATUS lnStatus = lnInstance->send(LnPacket, LN_BACKOFF_INITIAL);
 
 #ifdef DEBUG_SV
-  Serial.print("LNSV Send Response - Status: ");
-  Serial.println(lnStatus);   // report status value from send attempt
+  DEBUG("LNSV Send Response - Status: ");
+  DEBUG(lnStatus);   // report status value from send attempt
+  DEBUG("\n");
 #endif
 
   if (lnStatus != LN_DONE) {
@@ -1445,37 +1487,28 @@ SV_STATUS LocoNetSystemVariableClass::doDeferredProcessing( void )
 #define LNCV_FLAG_RO 0x01
 // other flags are currently unused
 
-//#define DEBUG_OUTPUT
-#undef DEBUG_OUTPUT
-
-#ifdef DEBUG_OUTPUT
-//#define DEBUG(x) Serial.print(F(x))
-#define DEBUG(x) Serial.print(x)
-#else
-#define DEBUG(x)
-#endif
 
 #ifdef DEBUG_OUTPUT
 void printPacket(lnMsg* LnPacket) {
-  Serial.print("LoconetPacket ");
-  Serial.print(LnPacket->ub.command, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.mesg_size, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.SRC, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.DSTL, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.DSTH, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.ReqId, HEX);
-  Serial.print(" ");
-  Serial.print(LnPacket->ub.PXCT1, HEX);
+  DEBUG("LoconetPacket ");
+  DEBUGHEX(LnPacket->ub.command);
+  DEBUG(" ");
+  DEBUGHEX(LnPacket->ub.mesg_size);
+  DEBUG(" ");
+  DEBUGHEX(LnPacket->ub.SRC);
+  DEBUG(" ");
+  DEBUGHEX(LnPacket->ub.DSTL);
+  DEBUG(" ");
+  DEBUGHEX(LnPacket->ub.DSTH);
+  DEBUG(" ");
+  DEBUGHEX(LnPacket->ub.ReqId);
+  DEBUG(" ");
+  DEBUGHEX(LnPacket->ub.PXCT1);
   for (int i(0); i < 7; ++i) {
-    Serial.print(" ");
-    Serial.print(LnPacket->ub.payload.D[i], HEX);
+    DEBUG(" ");
+    DEBUGHEX(LnPacket->ub.payload.D[i]);
   }
-  Serial.print("\n");
+  DEBUG("\n");
 }
 #endif
 
@@ -1490,23 +1523,23 @@ uint8_t LocoNetCVClass::processLNCVMessage(lnMsg * LnPacket) {
 	switch (LnPacket->sr.command) {
 	case OPC_IMM_PACKET:
 	case OPC_PEER_XFER:
-		DEBUG("Possibly a LNCV message.\n");
+  
+	  DEBUG("Possibly a LNCV message.");
+ 
 		// Either of these message types may be a LNCV message
 		// Sanity check: Message length, Verify addresses
 		if (LnPacket->ub.mesg_size == 15 && LnPacket->ub.DSTL == LNCV_MODULE_DSTL && LnPacket->ub.DSTH == LNCV_MODULE_DSTH) {
 			// It is a LNCV programming message
 			computeBytesFromPXCT(LnPacket->ub);
-			#ifdef DEBUG_OUTPUT
-			Serial.print("Message bytes: ");
-			Serial.print(LnPacket->ub.ReqId);
-			Serial.write(" ");
-			Serial.print(LnPacket->ub.payload.data.deviceClass, HEX);
-			Serial.write(" ");
-			Serial.print(LnPacket->ub.payload.data.lncvNumber, HEX);
-			Serial.write(" ");
-			Serial.print(LnPacket->ub.payload.data.lncvValue, HEX);
-			Serial.write("\n");
-			#endif
+			DEBUG("Message bytes: ");
+			DEBUGHEX(LnPacket->ub.ReqId);
+			DEBUG(" ");
+			DEBUGHEX(LnPacket->ub.payload.data.deviceClass);
+			DEBUG(" ");
+			DEBUGHEX(LnPacket->ub.payload.data.lncvNumber);
+			DEBUG(" ");
+			DEBUGHEX(LnPacket->ub.payload.data.lncvValue);
+			DEBUG("\n");
 
 			lnMsg response;
 
@@ -1565,15 +1598,17 @@ uint8_t LocoNetCVClass::processLNCVMessage(lnMsg * LnPacket) {
 								DEBUG(LnPacket->ub.payload.data.lncvValue);
 								DEBUG("\n");
 								makeLNCVresponse(response.ub, LnPacket->ub.SRC, LnPacket->ub.payload.data.deviceClass, 0x00, LnPacket->ub.payload.data.lncvValue, 0x80);
-								delay(10); // for whatever reason, we need to delay, otherwise the message will not be sent.
+#ifdef ARDUINO
+                delay(10); // for whatever reason, we need to delay, otherwise the message will not be sent.
+#endif
 								#ifdef DEBUG_OUTPUT
 								printPacket((lnMsg*)&response);
 								#endif
 								LN_STATUS status = lnInstance->send((lnMsg*)&response);
 								#ifdef DEBUG_OUTPUT
-								Serial.print(F("Return Code from Send: "));
-								Serial.print(status, HEX);
-								Serial.print("\n");
+								DEBUG("Return Code from Send: ");
+								DEBUGHEX(status);
+								DEBUG("\n");
 								#else
 								status = status; // Avoid Compiler Warnings about unused variable
 								#endif
@@ -1618,7 +1653,7 @@ uint8_t LocoNetCVClass::processLNCVMessage(lnMsg * LnPacket) {
 	break;
 #ifdef DEBUG_OUTPUT
 	default:
-		Serial.println("Not a LNCV message.");
+		DEBUG("Not a LNCV message.\n");
 #endif
 	}
 

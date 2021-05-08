@@ -59,11 +59,15 @@
 #ifndef _LN_BUF_INCLUDED
 #define _LN_BUF_INCLUDED
 
-#if defined(ARDUINO) && ARDUINO >= 100
+#if defined(ARDUINO)
+#if (ARDUINO >= 100)
 #include "Arduino.h"
 #else
 #include "WProgram.h"
-#endif
+#endif 
+#else
+// No Special Defines 
+#endif 
 
 #include "utility/ln_opc.h"
 

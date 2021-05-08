@@ -68,11 +68,17 @@
 
 
 
-#if defined(ARDUINO) && ARDUINO >= 100
+#if defined(ARDUINO)
+#if (ARDUINO >= 100)
 #include "Arduino.h"
 #else
 #include "WProgram.h"
-#endif
+#endif 
+#elif defined(ESP32)
+#include "Arduino.h"
+#else
+// No Special Defines 
+#endif 
 
 #include "LocoNetMessageBuffer.h"
 
@@ -139,6 +145,9 @@ class LocoNetClass
         LN_STATUS send(uint8_t OpCode, uint8_t Data1, uint8_t Data2);
         LN_STATUS send(uint8_t OpCode, uint8_t Data1, uint8_t Data2, uint8_t PrioDelay);
         virtual LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay) = 0;
+        virtual void debug(const char* Data) = 0;
+        virtual void debug(int32_t Data) = 0;
+        virtual void debug(uint32_t Data, uint8_t Base) = 0;
 
         LnRxStats* getRxStats(void);
         LnTxStats* getTxStats(void);
