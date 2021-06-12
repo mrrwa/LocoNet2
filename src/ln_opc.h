@@ -253,7 +253,7 @@ constexpr uint8_t LOCO_IN_USE   = STAT1_SL_BUSY + STAT1_SL_ACTIVE;
 constexpr uint8_t LOCO_IDLE     = STAT1_SL_BUSY;
 constexpr uint8_t LOCO_COMMON   = STAT1_SL_ACTIVE;
 constexpr uint8_t LOCO_FREE     = 0;
-#define LOCO_STAT(s)    (  ((s & LOCOSTAT_MASK)) ? "In-Use" : \
+#define LOCO_STAT(s)    (  ((s & LOCOSTAT_MASK) == LOCO_IN_USE) ? "In-Use" : \
                          ( ((s & LOCOSTAT_MASK) == LOCO_IDLE)   ? "Idle" : \
                           (((s & LOCOSTAT_MASK) == LOCO_COMMON) ? "Common" : \
                            "Free")))
