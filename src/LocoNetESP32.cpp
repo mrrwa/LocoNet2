@@ -31,6 +31,12 @@ uint8_t debugPinVal2=0;
 //#define DEBUG_ISR_DUMP()  do{ ets_printf(_msg); _msg[0]=0; } while(0);
 #endif
 
+/**
+ * Stack size needs to be enough for calling broacast which may call some handlers
+ * which may respond to packets which may cause another broadcast.
+ */
+constexpr uint32_t STACKSIZE = 4096;
+
 static LocoNetESP32 *locoNetInstance = nullptr;
 
 void IRAM_ATTR locoNetTimerCallback() {
@@ -56,7 +62,7 @@ bool LocoNetESP32::begin() {
     _txQueue = xQueueCreate(32, sizeof(uint8_t));
     
     xTaskCreatePinnedToCore(LocoNetESP32::rxByteProc, "LocoNetPhy", 
-        2048, (void* ) this, 2, &_rxByteTask, 1); // cpu1 
+        STACKSIZE, (void* ) this, 2, &_rxByteTask, 1); // cpu1 
 
     DEBUG("Configuring HW Timer %d as bit timer", _timerId);
     /* Use 1st timer of 4 (counted from zero).
