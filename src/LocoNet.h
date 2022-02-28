@@ -139,7 +139,7 @@ inline uint8_t lnPacketSize(const LnMsg * msg) {
     return LOCONET_PACKET_SIZE(msg->sz.command, msg->sz.mesg_size);
 }
 
-#define ADDR(hi,lo)  (   ((lo) | (((hi) & 0x0F ) << 7))    )
+#define ADDR(hi,lo)  (   (lo) | (( (hi) & 0x0F ) << 7)    )
 
 #define MAX_BACKEND_CONSUMERS  10
 
