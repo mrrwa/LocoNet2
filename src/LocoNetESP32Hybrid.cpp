@@ -49,7 +49,7 @@ LocoNetESP32Hybrid::LocoNetESP32Hybrid(LocoNetBus *bus, uint8_t rxPin, uint8_t t
 	_inst = this;
 
 	DEBUG("Initializing UART%d with RX:%d(%c), TX:%d(%c), timer %d", uartNum, _rxPin, _invertedRx?'I':'n', _txPin, _invertedTx?'I':'n', _timerId);
-	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, -1, 256, _invertedRx);
+	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, -1, 256, 32, _invertedRx, 192);
 	/*if(_invertedRx) {		
 		uartDetachRx(_uart);
 		uartAttachRx(_uart, _rxPin, true);
@@ -184,7 +184,8 @@ void LocoNetESP32Hybrid::rxtxTask() {
 				// last chance check for TX_COLLISION before starting TX
 				// st_urx_out contains the status of the UART RX state machine,
 				// any value other than zero indicates it is active.
-				if(uartRxActive(_uart) || digitalRead(_rxPin) == RX_LOW_VAL) {
+// AJS				if(uartRxActive(_uart) || digitalRead(_rxPin) == RX_LOW_VAL) {
+				if(digitalRead(_rxPin) == RX_LOW_VAL) {
 					DEBUG("uartActive: %d / digitalRead: %d",uartRxActive(_uart)?1:0,  digitalRead(_rxPin) == RX_LOW_VAL?1:0);
 					startCollisionTimer();
 				} else  {

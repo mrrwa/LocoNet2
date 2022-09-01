@@ -30,7 +30,7 @@ LocoNetESP32Uart::LocoNetESP32Uart(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin
 	_preferedCore(preferedCore), _state(IDLE) 
 {
 	DEBUG("Initializing UART(%d) with RX:%d, TX:%d", uartNum, _rxPin, _txPin);
-	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, _txPin, 256, false);
+	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, _txPin, 256, 32, false, 192);
 	if(_invertedRx) {		
 		uartDetachRx(_uart);
 		uartAttachRx(_uart, _rxPin, true);
@@ -139,8 +139,8 @@ void LocoNetESP32Uart::rxtxTask() {
 				// last chance check for TX_COLLISION before starting TX
 				// st_urx_out contains the status of the UART RX state machine,
 				// any value other than zero indicates it is active.
-				if(uartRxActive(_uart) ||
-					digitalRead(_rxPin) == !_invertedRx ? LOW : HIGH) {
+// AJS				if(uartRxActive(_uart) ||
+				if(digitalRead(_rxPin) == !_invertedRx ? LOW : HIGH) {
 					startCollisionTimer();
 				} else  {
 					// no collision, start TX
