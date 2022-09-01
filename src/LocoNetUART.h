@@ -36,7 +36,7 @@
 
 #pragma once
 
-#include "LocoNet.h"
+#include "LocoNet2.h"
 #ifndef ESP32
 
 #define RX_BUFFER_SIZE	64

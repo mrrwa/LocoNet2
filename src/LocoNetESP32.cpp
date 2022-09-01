@@ -2,7 +2,6 @@
 
 #include <functional>
 #include <algorithm>
-#include "LocoNet.h"
 #include "LocoNetSVCV.h"
 
 

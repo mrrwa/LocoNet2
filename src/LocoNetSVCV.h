@@ -1,6 +1,6 @@
 #pragma once
 
-#include "LocoNet.h"
+#include "LocoNet2.h"
 
 
 

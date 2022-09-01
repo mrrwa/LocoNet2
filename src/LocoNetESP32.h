@@ -36,7 +36,7 @@
 
 #pragma once
 
-#include "LocoNet.h"
+#include "LocoNet2.h"
 #include <Arduino.h>
 #include <esp32-hal-timer.h>
 

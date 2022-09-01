@@ -36,7 +36,7 @@
 
 #pragma once
 
-#include "LocoNet.h"
+#include "LocoNet2.h"
 #include <esp32-hal-gpio.h>
 #include <esp32-hal-uart.h>
 #include <freertos/queue.h>
