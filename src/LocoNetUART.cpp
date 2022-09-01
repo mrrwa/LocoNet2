@@ -1,8 +1,5 @@
 #include "LocoNetUART.h"
-
-void LocoNetUartClass::init()
-{
-}
+#ifndef ESP32
 
 LN_STATUS LocoNetUartClass::sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay)
 {
@@ -12,17 +9,4 @@ LN_STATUS LocoNetUartClass::sendLocoNetPacketTry(lnMsg *txData, unsigned char uc
 	return LN_DONE;
 }
 
-void LocoNetUartClass::debug(int32_t Data)
-{
-	
-}	
-
-void LocoNetUartClass::debug(const char* Data) 
-{
-	
-}
-
-void LocoNetUartClass::debug(uint32_t Data, uint8_t Base)
-{
-	
-}
+#endif

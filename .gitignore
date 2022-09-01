@@ -28,3 +28,7 @@
 *.app
 
 .tags
+
+.pioenvs
+.piolibdeps
+.vscode

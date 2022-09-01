@@ -1,6 +1,3 @@
-#ifndef LOCONETAVRICP_INCLUDED
-#define LOCONETAVRICP_INCLUDED
-
 /****************************************************************************
  * 	Copyright (C) 2015 Alex Shepherd
  * 
@@ -37,15 +34,16 @@
  * 
  *****************************************************************************/
 
-#include "utility/LocoNet.h"
+#pragma once
 
-class LocoNetAvrIcpClass: public LocoNetClass
+#include "LocoNet.h"
+#ifndef ESP32
+
+class LocoNetAvrIcp: public LocoNet
 {
 	public:
-		void init(uint8_t txPin);
-		void debug(const char* Data);
-		void debug(int32_t Data);
-		void debug(uint32_t Data, uint8_t Base);
+		LocoNetAvrIcp(uint8_t txPin);
+		virtual bool begin();
 		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
 };
 
