@@ -36,28 +36,40 @@
 
 #pragma once
 
+#include <Arduino.h>
+#include <Stream.h>
+
 #include "LocoNet2.h"
-#ifndef ESP32
 
-#define RX_BUFFER_SIZE	64
+typedef bool (*lnIsBusy)(void);
+typedef void (*lnSendBreak)(void);
+typedef uint32_t (*lnUpdateRxFifoFullThreshold)(uint32_t newThreshold);
 
-extern "C" void USART_TX_vect(void) __attribute__ ((signal));
-
-class LocoNetUart: public LocoNet {
-	private:
-		volatile uint8_t  lnState ;
-		volatile uint8_t  lnBitCount ;
-		volatile uint8_t  lnCurrentByte ;
-		volatile uint16_t lnCompareTarget ;
-
-		volatile uint8_t	rxHead;
-		volatile uint8_t	rxTail;
-		uint8_t						rxBuffer[RX_BUFFER_SIZE];
-	protected:
-		LN_STATUS sendLocoNetPacketTry(lnMsg *txData, unsigned char ucPrioDelay);
+class LocoNetStream: public LocoNetPhy {
 	public:
-		virtual bool begin();
+		LocoNetStream(LocoNetBus *bus) : LocoNetPhy(bus), _state(LN_IDLE){};
+		
+		bool begin(Stream & serialPort, lnIsBusy lnIsBusyFuncPtr, lnSendBreak lnSendBreakFuncPtr, lnUpdateRxFifoFullThreshold _lnUpdateRxFifoFullThresholdFuncPtr);
+		void end();
+		void process();
+
+	protected:
+		LN_STATUS sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay);
+		
+	private:
+		void startCollisionTimer();
+		bool hasCollisionTimerExpired();
+		void startCDBackoffTimer();
+		bool hasCDBackoffTimerExpired(uint8_t PrioDelay = 0);
+		
+		Stream * 	_serialPort;
+		uint64_t 	_cdBackoffStart;
+		uint64_t 	_cdBackoffTimeout;
+		uint64_t 	_collisionTimeout;
+		LN_STATUS	_state;
+		lnIsBusy	_lnIsBusyPtr;
+		lnSendBreak	_lnSendBreakPtr;
+		lnUpdateRxFifoFullThreshold _lnUpdateRxFifoFullThresholdPtr;
 };
 
-#endif
 
