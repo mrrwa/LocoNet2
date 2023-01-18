@@ -51,7 +51,7 @@ public:
     }
 
     void removeConsumer(MsgConsumer * c) {
-        consumers.erase( std::remove(consumers.begin(), consumers.end(), c), consumers.end() );
+        consumers.erase( etl::remove(consumers.begin(), consumers.end(), c), consumers.end() );
     }
 
 private:

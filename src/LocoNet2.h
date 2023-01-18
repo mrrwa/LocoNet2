@@ -77,32 +77,46 @@
 #include "LocoNetMessageBuffer.h"
 #include "Bus.h"
 
-#define DEBUG_OUTPUT_
+// #if defined(ARDUINO_ARCH_AVR)
+// 	#include "LocoNetAvrICP.h"
+// #elif defined(ARDUINO_ARCH_ESP32)
+// 	#include "LocoNetESP32.h"
+// 	#include "LocoNetESP32Hybrid.h"
+// 	#include "LocoNetESP32UART.h"
+// #endif
+// 
+// #include "LocoNetStream.h"
+
+// Uncomment the next line to enable library DEBUG Messages
+#define DEBUG_OUTPUT
 
 #ifdef DEBUG_OUTPUT
-#include <cstdio>
-#if defined(ESP32) && ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
-#include <esp32-hal-log.h>
-#define DEBUG(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
-#define DEBUG_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
+	#include <cstdio>
+	#if defined(ESP32) && ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
+		#include <esp32-hal-log.h>
+		#define DEBUG(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
+		#define DEBUG_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
+	#else
+		#define DEBUG(...) { printf(__VA_ARGS__); printf("\n"); }
+		#define DEBUG_ISR(...) { printf(__VA_ARGS__); printf("\n"); }
+	#endif
 #else
-#define DEBUG(...) { printf(__VA_ARGS__); printf("\n"); }
-#define DEBUG_ISR(...) { printf(__VA_ARGS__); printf("\n"); }
-#endif
-#else
-#define DEBUG(format, ...)
-#define DEBUG_ISR(format, ...)
+	#define DEBUG(format, ...)
+	#define DEBUG_ISR(format, ...)
 #endif
 
 typedef enum
 {
-    LN_CD_BACKOFF = 0, LN_PRIO_BACKOFF, LN_NETWORK_BUSY, LN_DONE, LN_COLLISION, LN_UNKNOWN_ERROR, LN_RETRY_ERROR
+    LN_IDLE = 0, LN_NETWORK_BUSY, LN_CD_BACKOFF, LN_PRIO_BACKOFF, LN_COLLISION, LN_UNKNOWN_ERROR, LN_RETRY_ERROR
 } LN_STATUS;
 
 
-using LocoNetBus = Bus<LnMsg, LN_STATUS, LN_STATUS::LN_DONE, 10>;
+using LocoNetBus = Bus<LnMsg, LN_STATUS, LN_STATUS::LN_IDLE, 10>;
 
 using LocoNetConsumer = Consumer<LnMsg, LN_STATUS>;
+
+constexpr int LOCONET_BAUD = 16667; // LocoNet BAUD Rate
+constexpr int LOCONET_BREAK_BAUD = 9600; // LocoNet BAUD Rate
 
 // CD Backoff starts after the Stop Bit (Bit 9) and has a minimum or 20 Bit Times
 // but initially starts with an additional 20 Bit Times
@@ -113,6 +127,15 @@ constexpr uint8_t LN_BACKOFF_MIN        = (LN_CARRIER_TICKS + LN_MASTER_DELAY); 
 constexpr uint8_t LN_BACKOFF_INITIAL    = (LN_BACKOFF_MIN + LN_INITIAL_PRIO_DELAY);  // for the first normal tx attempt
 constexpr uint8_t LN_BACKOFF_MAX        = (LN_BACKOFF_INITIAL + 10);                 // lower priority is not supported
 constexpr uint8_t LN_COLLISION_TICKS    = 15; //< after collision the bus will be low for this number of ticks.
+
+// number of microseconds for one bit
+constexpr uint8_t LocoNetTickTime = 60;
+
+// number of microseconds to remain in a collision state
+constexpr uint32_t CollisionTimeoutIncrement = 15 * LocoNetTickTime;
+
+// number of microseconds to remain in a CD BACKOFF state
+constexpr uint32_t CDBackoffTimeoutIncrement = LocoNetTickTime * LN_CARRIER_TICKS;
 
 //
 // LNCV error codes

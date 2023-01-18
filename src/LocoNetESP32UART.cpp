@@ -1,17 +1,9 @@
 #include "LocoNetESP32UART.h"
 #include <esp_task_wdt.h>
+#include <esp_arduino_version.h>
 
 constexpr UBaseType_t LocoNetRXTXThreadPriority = 1;
 constexpr uint32_t LocoNetRXTXThreadStackSize = 2048;
-
-// number of microseconds for one bit
-constexpr uint8_t LocoNetTickTime = 60;
-
-// number of microseconds to remain in a collision state
-constexpr uint32_t CollisionTimeoutIncrement = 15 * LocoNetTickTime;
-
-// number of microseconds to remain in a CD BACKOFF state
-constexpr uint32_t CDBackoffTimeoutIncrement = LocoNetTickTime * LN_CARRIER_TICKS;
 
 #define LOCONET_TX_LOCK()    do {} while (xSemaphoreTake(_txQueuelock, portMAX_DELAY) != pdPASS)
 #define LOCONET_TX_UNLOCK()  xSemaphoreGive(_txQueuelock)
@@ -30,7 +22,14 @@ LocoNetESP32Uart::LocoNetESP32Uart(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin
 	_preferedCore(preferedCore), _state(IDLE) 
 {
 	DEBUG("Initializing UART(%d) with RX:%d, TX:%d", uartNum, _rxPin, _txPin);
-	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, _txPin, 256, 32, false, 192);
+	
+#if ( defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 2) )
+	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, _txPin, 256, 0, false, 0);
+	uartSetRxInvert(_uart, _invertedRx);
+// AJS	uartSetTxInvert(_uart, _invertedTx);
+#else
+	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, _txPin, 256, false);
+
 	if(_invertedRx) {		
 		uartDetachRx(_uart);
 		uartAttachRx(_uart, _rxPin, true);
@@ -39,6 +38,7 @@ LocoNetESP32Uart::LocoNetESP32Uart(LocoNetBus *bus, uint8_t rxPin, uint8_t txPin
 		uartDetachTx(_uart);
 		uartAttachTx(_uart, _txPin, true);
 	}
+#endif
 
 	_rxtxTask = nullptr;
 	// note: this needs to be done after uartBegin which will set the pin mode to INPUT only.
@@ -139,27 +139,30 @@ void LocoNetESP32Uart::rxtxTask() {
 				// last chance check for TX_COLLISION before starting TX
 				// st_urx_out contains the status of the UART RX state machine,
 				// any value other than zero indicates it is active.
-// AJS				if(uartRxActive(_uart) ||
 				if(digitalRead(_rxPin) == !_invertedRx ? LOW : HIGH) {
 					startCollisionTimer();
 				} else  {
 					// no collision, start TX
 					_state = TX;
+					DEBUG("No Collision");
 					while(uxQueueMessagesWaiting(_txQueue) > 0 && _state == TX) {
 						uint8_t out;
 						uint32_t t0=0;
-						if(xQueueReceive(_txQueue, &out, (portTickType)1)) {
+						if(xQueueReceive(_txQueue, &out, (portTickType)0)) {
+							DEBUG("Send Byte: %0x", out);
 							uartWrite(_uart, out);
 							// wait for echo byte before sending next byte
 							uint32_t t1=micros();
 							while(!uartAvailable(_uart)) {
 								esp_task_wdt_reset();
+								yield();
 								//delay(1);
 							}
 							t0 += (micros()-t1);
 							DEBUG("Took %d uS", t0);
 							// check echoed byte for collision
 							if(uartRead(_uart) != out) {
+								DEBUG("Send Byte: Collision");
 								startCollisionTimer();
 							}
 						}
@@ -186,7 +189,8 @@ void LocoNetESP32Uart::rxtxTask() {
 			digitalWrite(_txPin, _invertedTx ? LOW : HIGH);
 		}
 		esp_task_wdt_reset();
-		delay(1);
+		yield();
+// 		delay(1);
 	}
 }
 
@@ -206,19 +210,21 @@ LN_STATUS LocoNetESP32Uart::sendLocoNetPacketTry(uint8_t *packetData, uint8_t pa
 		}
 		LOCONET_TX_LOCK();
 		for(uint8_t index = 0; index < packetLen && (_state == IDLE || _state == TX); index++) {
-			while(xQueueSendToBack(_txQueue, &packetData[index], (portTickType)5) != pdPASS) {
+			while(xQueueSendToBack(_txQueue, &packetData[index], (portTickType)0) != pdPASS) {
 				esp_task_wdt_reset();
-				delay(1);
+				yield();
+// 				delay(1);
 			}
 		}
 		LOCONET_TX_UNLOCK();
 		// wait for TX to complete
 		while(_state == IDLE || _state == TX) {
 			esp_task_wdt_reset();
-			delay(1);
+			yield();
+// 			delay(1);
 		}
 		if(_state == IDLE || _state == CD_BACKOFF) {
-			return LN_DONE;
+			return LN_IDLE;
 		} else if(_state == TX_COLLISION) {
 			return LN_COLLISION;
 		}

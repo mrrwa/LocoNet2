@@ -258,7 +258,7 @@ SV_STATUS LocoNetSystemVariable::processMessage(const lnMsg *rxPacket) {
   LN_STATUS lnStatus = _locoNet.send(LnPacket);
   DEBUG("LNSV Send Response - Status: %d", lnStatus);
 
-  if (lnStatus != LN_DONE) {
+  if (lnStatus != LN_IDLE) {
     // failed to send the SV reply message.  Send will NOT be re-tried.
     _locoNet.send(OPC_LONG_ACK, (OPC_PEER_XFER & 0x7F), 44);  // indicate failure to send the reply
   }
@@ -292,7 +292,7 @@ SV_STATUS LocoNetSystemVariable::doDeferredProcessing() {
 
     encodePeerData(&msg.px, unData.abPlain);
 
-    if(_locoNet.send(&msg) != LN_DONE) {
+    if(_locoNet.send(&msg) != LN_IDLE) {
       return SV_DEFERRED_PROCESSING_NEEDED;
     }
     _deferredProcessingRequired = false;

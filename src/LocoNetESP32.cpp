@@ -135,11 +135,15 @@ void LocoNetESP32::enableStartBitISR(bool en) {
 
 void IRAM_ATTR LocoNetESP32::changeState(LN_TX_RX_STATUS newStat, Lock lock, uint8_t bit) {
     if(lock==Lock::LOCK)
-    	portENTER_CRITICAL(&_timerMux)
+    {
+    	portENTER_CRITICAL(&_timerMux);
+    }
     else
+    {
     	if(lock==Lock::LOCK_FROM_ISR)
     		portENTER_CRITICAL_ISR(&_timerMux);
-      
+    }
+     
     DEBUG_ISR("changeState %s", newState==LN_ST_IDLE?"LN_ST_IDLE":newState==LN_ST_CD_BACKOFF?"LN_ST_CD_BACKOFF":newState==LN_ST_TX_COLLISION?"LN_ST_TX_COLLISION":newState==LN_ST_TX?"LN_ST_TX":"LN_ST_RX");
     // #ifdef GPIO_DEBUG
     // digitalWrite(DEBUG_IOPIN, HIGH);//debugPinVal2%2);  debugPinVal2+=1;
@@ -170,10 +174,14 @@ void IRAM_ATTR LocoNetESP32::changeState(LN_TX_RX_STATUS newStat, Lock lock, uin
     _currentBit = bit;
 
     if(lock==Lock::LOCK)
-    	portEXIT_CRITICAL(&_timerMux)
+    {
+    	portEXIT_CRITICAL(&_timerMux);
+    }
     else
+    {
     	if(lock==Lock::LOCK_FROM_ISR)
     		portEXIT_CRITICAL_ISR(&_timerMux);
+    }
 }
 
 
@@ -443,7 +451,7 @@ LN_STATUS LocoNetESP32::sendLocoNetPacketTry(uint8_t *packetData, uint8_t packet
     }
     if(_state == LN_ST_CD_BACKOFF || _state == LN_ST_IDLE) {
         txStats.txPackets++;
-        return LN_DONE;
+        return LN_IDLE;
     } else if(_state == LN_ST_TX_COLLISION) {
         return LN_COLLISION;
     }

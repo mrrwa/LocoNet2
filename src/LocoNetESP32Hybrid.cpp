@@ -1,18 +1,9 @@
 #include "LocoNetESP32Hybrid.h"
 #include <esp_task_wdt.h>
-
+#include <esp_arduino_version.h>
 
 constexpr UBaseType_t LocoNetRXTXThreadPriority = 1;
 constexpr uint32_t LocoNetRXTXThreadStackSize = 2048;
-
-// number of microseconds for one bit
-constexpr uint8_t LocoNetTickTime = 60;
-
-// number of microseconds to remain in a collision state
-constexpr uint32_t CollisionTimeoutIncrement = 15 * LocoNetTickTime;
-
-// number of microseconds to remain in a CD BACKOFF state
-constexpr uint32_t CDBackoffTimeoutIncrement = LocoNetTickTime * LN_CARRIER_TICKS;
 
 #define LOCONET_TX_LOCK()    do {} while (xSemaphoreTake(_txQueuelock, portMAX_DELAY) != pdPASS)
 #define LOCONET_TX_UNLOCK()  xSemaphoreGive(_txQueuelock)
@@ -49,7 +40,13 @@ LocoNetESP32Hybrid::LocoNetESP32Hybrid(LocoNetBus *bus, uint8_t rxPin, uint8_t t
 	_inst = this;
 
 	DEBUG("Initializing UART%d with RX:%d(%c), TX:%d(%c), timer %d", uartNum, _rxPin, _invertedRx?'I':'n', _txPin, _invertedTx?'I':'n', _timerId);
-	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, -1, 256, 32, _invertedRx, 192);
+
+#if ( defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 2) )
+	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, -1, 256, 0, _invertedRx, 0);
+#else
+	_uart = uartBegin(uartNum, 16667, SERIAL_8N1, _rxPin, -1, 256, _invertedRx);
+#endif	
+
 	/*if(_invertedRx) {		
 		uartDetachRx(_uart);
 		uartAttachRx(_uart, _rxPin, true);
@@ -184,9 +181,8 @@ void LocoNetESP32Hybrid::rxtxTask() {
 				// last chance check for TX_COLLISION before starting TX
 				// st_urx_out contains the status of the UART RX state machine,
 				// any value other than zero indicates it is active.
-// AJS				if(uartRxActive(_uart) || digitalRead(_rxPin) == RX_LOW_VAL) {
 				if(digitalRead(_rxPin) == RX_LOW_VAL) {
-					DEBUG("uartActive: %d / digitalRead: %d",uartRxActive(_uart)?1:0,  digitalRead(_rxPin) == RX_LOW_VAL?1:0);
+					DEBUG("digitalRead: %d", digitalRead(_rxPin) == RX_LOW_VAL?1:0);
 					startCollisionTimer();
 				} else  {
 					// no collision, start TX
@@ -289,7 +285,7 @@ LN_STATUS LocoNetESP32Hybrid::sendLocoNetPacketTry(uint8_t *packetData, uint8_t 
 			delay(1);
 		}
 		if(_state == IDLE || _state == CD_BACKOFF) {
-			return LN_DONE;
+			return LN_IDLE;
 		} else if(_state == TX_COLLISION) {
 			return LN_COLLISION;
 		}
