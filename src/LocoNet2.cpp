@@ -69,10 +69,10 @@
 #include "LocoNet2.h"
 
 const char * LoconetStatusStrings[] = {
+	"Idle",
+	"Network Busy",
 	"CD Backoff",
 	"Prio Backoff",
-	"Network Busy",
-	"Done",
 	"Collision",
 	"Unknown Error",
 	"Retry Error"
@@ -95,7 +95,7 @@ LN_STATUS LocoNetPhy::onMessage(const LnMsg& msg) {
 }
 
 const char* LocoNetPhy::getStatusStr(LN_STATUS Status) {
-  if ((Status >= LN_CD_BACKOFF) && (Status <= LN_RETRY_ERROR)) {
+  if ((Status >= LN_IDLE) && (Status <= LN_RETRY_ERROR)) {
     return LoconetStatusStrings[Status];
   }
 
@@ -145,10 +145,10 @@ LN_STATUS LocoNetPhy::send(LnMsg *pPacket, uint8_t ucPrioDelay) {
       //DEBUG("calling sendLocoNetPacketTry(%p, %d, %d) attempt %d", packet, packetLen, ucPrioDelay, ucTry);
       enReturn = sendLocoNetPacketTry(pPacket->data, packetLen, ucPrioDelay);
       DEBUG("attempt %d, sendLocoNetPacketTry(%p, len=%d, priority=%d)=%s", 
-          ucTry, packet, packetLen, ucPrioDelay,
-          enReturn==LN_CD_BACKOFF?"LN_CD_BACKOFF" : enReturn==LN_PRIO_BACKOFF?"LN_PRIO_BACKOFF" : enReturn==LN_NETWORK_BUSY?"LN_NETWORK_BUSY": enReturn==LN_DONE?"LN_DONE": enReturn==LN_COLLISION?"LN_COLLISION": enReturn==LN_UNKNOWN_ERROR?"LN_UNKNOWN_ERROR":"LN_RETRY_ERROR"); 
-      if (enReturn == LN_DONE) { // success?
-        return LN_DONE;
+          ucTry, pPacket, packetLen, ucPrioDelay,
+          enReturn==LN_CD_BACKOFF?"LN_CD_BACKOFF" : enReturn==LN_PRIO_BACKOFF?"LN_PRIO_BACKOFF" : enReturn==LN_NETWORK_BUSY?"LN_NETWORK_BUSY": enReturn==LN_IDLE?"LN_IDLE": enReturn==LN_COLLISION?"LN_COLLISION": enReturn==LN_UNKNOWN_ERROR?"LN_UNKNOWN_ERROR":"LN_RETRY_ERROR"); 
+      if (enReturn == LN_IDLE) { // success?
+        return LN_IDLE;
       }
 
       if (enReturn == LN_PRIO_BACKOFF) {
@@ -157,6 +157,7 @@ LN_STATUS LocoNetPhy::send(LnMsg *pPacket, uint8_t ucPrioDelay) {
       }
       //break;
     } while ((enReturn == LN_CD_BACKOFF) ||                             // waiting CD backoff
+             (enReturn == LN_COLLISION) ||                           	// waiting for the collision to expire
              (enReturn == LN_PRIO_BACKOFF) ||                           // waiting master+prio backoff
             ((enReturn == LN_NETWORK_BUSY) && ucWaitForEnterBackoff));  // or within any traffic unfinished
     // failed -> next try going to higher prio = smaller prio delay
@@ -273,7 +274,7 @@ LocoNetDispatcher::LocoNetDispatcher(LocoNetBus *ln): ln(ln) {
 
 LN_STATUS LocoNetDispatcher::onMessage(const LnMsg& msg) {
   processPacket(&msg);
-  return LN_DONE;
+  return LN_IDLE;
 }
 
 LN_STATUS LocoNetDispatcher::send(LnMsg *txPacket) {
