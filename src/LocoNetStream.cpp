@@ -33,11 +33,10 @@ LN_STATUS LocoNetStream::sendLocoNetPacketTry(uint8_t *packetData, uint8_t packe
 		// Do a process() just in case another byte has arrived after we last checked 
 	process();
 	
-	if(_lnIsBusyPtr && _lnIsBusyPtr() == false)
+	if( !isBusy() )
 	{
 		uint32_t tempRxThreshold;
-		if(_lnUpdateRxFifoFullThresholdPtr)
-			tempRxThreshold = _lnUpdateRxFifoFullThresholdPtr(1);
+		beforeSend();
 		
 		DEBUG("sendLocoNetPacketTry: Start to send data");
 		while(packetLen--)
@@ -56,14 +55,9 @@ LN_STATUS LocoNetStream::sendLocoNetPacketTry(uint8_t *packetData, uint8_t packe
 				startCollisionTimer();
 					
 				txStats.collisions++;
-				if(_lnSendBreakPtr)
-				{
-					DEBUG("sendLocoNetPacketTry: Send Break");
-					_lnSendBreakPtr();
-				}
+				sendBreak();
 
-				if(_lnUpdateRxFifoFullThresholdPtr)
-					_lnUpdateRxFifoFullThresholdPtr(tempRxThreshold);
+				afterSend();
 					
 				return LN_COLLISION;
 			}
@@ -74,8 +68,7 @@ LN_STATUS LocoNetStream::sendLocoNetPacketTry(uint8_t *packetData, uint8_t packe
 		
 		startCDBackoffTimer();
 		
-		if(_lnUpdateRxFifoFullThresholdPtr)
-			_lnUpdateRxFifoFullThresholdPtr(tempRxThreshold);
+		afterSend();
 
 		return LN_IDLE;
 	}
@@ -83,14 +76,9 @@ LN_STATUS LocoNetStream::sendLocoNetPacketTry(uint8_t *packetData, uint8_t packe
 	return LN_NETWORK_BUSY;
 }
 
-bool LocoNetStream::begin(Stream & serialPort, lnIsBusy lnIsBusyFuncPtr, lnSendBreak lnSendBreakFuncPtr, lnUpdateRxFifoFullThreshold _lnUpdateRxFifoFullThresholdFuncPtr)
+void LocoNetStream::begin(Stream * serialPort)
 {
-	_serialPort = & serialPort;
-	_lnIsBusyPtr = lnIsBusyFuncPtr;
-	_lnSendBreakPtr = lnSendBreakFuncPtr;
-	_lnUpdateRxFifoFullThresholdPtr = _lnUpdateRxFifoFullThresholdFuncPtr;
-	
-	return true;
+	_serialPort = serialPort;
 }
 
 void LocoNetStream::end()
@@ -119,7 +107,7 @@ void LocoNetStream::process()
 		_state = LN_CD_BACKOFF;
 	}
 	
-	if(_state == LN_IDLE && _lnIsBusyPtr && _lnIsBusyPtr())
+	if(_state == LN_IDLE && isBusy())
 	{
 		DEBUG("process: LocoNet Active");
 		startCDBackoffTimer();

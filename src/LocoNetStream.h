@@ -41,20 +41,22 @@
 
 #include "LocoNet2.h"
 
-typedef bool (*lnIsBusy)(void);
-typedef void (*lnSendBreak)(void);
-typedef uint32_t (*lnUpdateRxFifoFullThreshold)(uint32_t newThreshold);
-
 class LocoNetStream: public LocoNetPhy {
 	public:
 		LocoNetStream(LocoNetBus *bus) : LocoNetPhy(bus), _state(LN_IDLE){};
 		
-		bool begin(Stream & serialPort, lnIsBusy lnIsBusyFuncPtr, lnSendBreak lnSendBreakFuncPtr, lnUpdateRxFifoFullThreshold _lnUpdateRxFifoFullThresholdFuncPtr);
+		void begin(Stream * serialPort);
 		void end();
 		void process();
 
+
 	protected:
 		LN_STATUS sendLocoNetPacketTry(uint8_t *packetData, uint8_t packetLen, unsigned char ucPrioDelay);
+
+		virtual bool isBusy(void);
+		virtual void sendBreak(void);
+		virtual void beforeSend(void);
+		virtual void afterSend(void);
 		
 	private:
 		void startCollisionTimer();
@@ -67,9 +69,6 @@ class LocoNetStream: public LocoNetPhy {
 		uint64_t 	_cdBackoffTimeout;
 		uint64_t 	_collisionTimeout;
 		LN_STATUS	_state;
-		lnIsBusy	_lnIsBusyPtr;
-		lnSendBreak	_lnSendBreakPtr;
-		lnUpdateRxFifoFullThreshold _lnUpdateRxFifoFullThresholdPtr;
 };
 
 
