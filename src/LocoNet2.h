@@ -130,6 +130,7 @@ constexpr uint8_t LN_COLLISION_TICKS    = 15; //< after collision the bus will b
 
 // number of microseconds for one bit
 constexpr uint8_t LocoNetTickTime = 60;
+constexpr uint16_t LocoNetRxByteMicros = LocoNetTickTime * 10;	// StartBit + 8 Data Bits + StopBit = 10 Bits
 
 // number of microseconds to remain in a collision state
 constexpr uint32_t CollisionTimeoutIncrement = 15 * LocoNetTickTime;
