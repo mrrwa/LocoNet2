@@ -1,3 +1,5 @@
+#ifdef ARDUINO_ARCH_ESP32
+
 #include "LocoNetESP32Hybrid.h"
 #include <esp_task_wdt.h>
 #include <esp_arduino_version.h>
@@ -292,3 +294,4 @@ LN_STATUS LocoNetESP32Hybrid::sendLocoNetPacketTry(uint8_t *packetData, uint8_t 
 	}
 	return LN_UNKNOWN_ERROR;
 }
+#endif

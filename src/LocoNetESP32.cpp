@@ -1,3 +1,5 @@
+#ifdef ARDUINO_ARCH_ESP32
+
 #include "LocoNetESP32.h"
 
 #include <functional>
@@ -489,3 +491,4 @@ void LocoNetSystemVariable::reconfigure() {
     // reset the esp32
     esp_restart();
 }
+#endif

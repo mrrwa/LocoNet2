@@ -73,14 +73,14 @@ class LocoNetStreamESP32: public LocoNetStream {
 		{
 			uart_dev_t *hw = UART_LL_GET_HW(_uart_nr);		 	
 
-		#if defined(ARDUINO_ESP32_MCU_esp32c3)    
+ 		#if defined(ARDUINO_ESP32_MCU_esp32c3)    
 		  	return hw->fsm_status.st_urx_out != 0;
 			
-		#elif defined(ARDUINO_ESP32_MCU_esp32)  
-			return hw->status.st_urx_out != 0;
-		#else
-		#error "Unsupported ESP32 Archutecture"
-		#endif
+ 		#elif defined(ARDUINO_ESP32_MCU_esp32)  
+ 			return hw->status.st_urx_out != 0;
+ 		#else
+ 		#error "Unsupported ESP32 Archutecture"
+ 		#endif
 		};
 
 		void beforeSend(void)

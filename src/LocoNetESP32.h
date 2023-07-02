@@ -34,6 +34,8 @@
  *
  *****************************************************************************/
 
+#ifdef ARDUINO_ARCH_ESP32
+
 #pragma once
 
 #include "LocoNet2.h"
@@ -99,3 +101,4 @@ class LocoNetESP32: public LocoNetPhy
         friend void locoNetStartBitCallback();
 
 };
+#endif

@@ -34,8 +34,9 @@
  *
  *****************************************************************************/
 
+#ifdef ARDUINO_ARCH_AVR
+
 #include "LocoNetAvrICP.h"
-#ifndef ESP32
 
 bool LocoNetAvrIcp::begin(uint8_t txPin)
 {
