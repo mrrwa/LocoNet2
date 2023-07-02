@@ -23,7 +23,7 @@
       "type": "git",
       "url": "https://github.com/mrrwa/LocoNet2"
     },
-    "version": "2.0.1",
+    "version": "2.2.0",
     "license": "GPL-2.0-or-later",
     "frameworks": "arduino",
     "platforms": "espressif32",
