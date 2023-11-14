@@ -1,4 +1,4 @@
-#include <LocoNetStream.h>
+#include <LocoNetStreamRP2040.h>
 #include <Bounce2.h>
 
 #define LOCONET_PIN_RX  17
@@ -9,12 +9,12 @@
 
 LocoNetBus bus;
 LocoNetDispatcher parser(&bus);
-LocoNetStreamPico lnStream(&Serial1, LOCONET_PIN_RX, LOCONET_PIN_TX, &bus);
+LocoNetStreamRP2040 lnStream(&Serial1, LOCONET_PIN_RX, LOCONET_PIN_TX, &bus);
 Bounce2::Button button = Bounce2::Button();
 
 void LocoNetActiveInterrupt(void)
 {
-  lnStream.LocoNetActivity();
+  lnStream.handleLocoNetActivityInterrupt();
 }
 
 void setup()
