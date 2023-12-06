@@ -9,7 +9,11 @@
 
 LocoNetBus bus;
 LocoNetDispatcher parser(&bus);
-LocoNetStreamRP2040 lnStream(&Serial1, LOCONET_PIN_RX, LOCONET_PIN_TX, &bus);
+
+// The line below initialised the LocoNet interface for the correct signal polarity of the IoTT LocoNet Interface board
+// See: https://myiott.org/index.php/iott-stick/communication-modules/loconet-interface
+LocoNetStreamRP2040 lnStream(&Serial1, LOCONET_PIN_RX, LOCONET_PIN_TX, &bus, true, true);
+
 Bounce2::Button button = Bounce2::Button();
 
 void LocoNetActiveInterrupt(void)
