@@ -82,7 +82,7 @@ class LocoNetESP32: public LocoNetPhy
             VAL_RX_HIGH=HIGH
         };
 
-        bool _isrAttached;
+        bool _isrAttached = false;
         void IRAM_ATTR enableStartBitISR(bool en=true) ;
         void IRAM_ATTR loconetStartBit();
         void IRAM_ATTR loconetBitTimer();
