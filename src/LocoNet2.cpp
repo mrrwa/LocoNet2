@@ -448,7 +448,7 @@ void LocoNetDispatcher::onMultiSenseTransponder (std::function<void (uint16_t, u
             callback (OPC_MULTI_SENSE_BOARD_ADDRESS (packet->mstr.zone, packet->mstr.type),
                       OPC_MULTI_SENSE_ZONE_ID (packet->mstr.zone),
                       OPC_MULTI_SENSE_LOCO_ADDRESS (packet->mstr.adr1, packet->mstr.adr2),
-                      OPC_MULTI_SENSE_PRESENCE (packet->mstr.zone));
+                      OPC_MULTI_SENSE_PRESENCE (packet->mstr.type));
         }
     });
 }
