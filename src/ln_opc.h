@@ -183,6 +183,15 @@ constexpr uint8_t OPC_MULTI_SENSE_ZONE_MASK = 0x0F;
 #define OPC_MULTI_SENSE_PRESENCE(type) \
     type & OPC_MULTI_SENSE_PRESENT
 
+#define OPC_MULTI_SENSE_LONG_PRESENCE(msl_i) \
+    msl_i & OPC_MULTI_SENSE_PRESENT
+#define OPC_MULTI_SENSE_LONG_BOARD_ADDRESS(msl_i, blk_l) \
+    ((msl_i & 0x1F) << 7) + blk_l + 1
+#define OPC_MULTI_SENSE_LONG_LOCO_ADDRESS(ad_h, ad_l) \
+    ad_l + (ad_h != 0x7D ? ad_h << 7 : 0)
+#define OPC_MULTI_SENSE_LONG_DIRECTION(rcdv_h) \
+    (rcdv_h & 0x40) != 0
+
 /* Slot Status byte definitions and macros */
 /***********************************************************************************
 *   D7-SL_SPURGE    ; 1=SLOT purge en,                                             *
@@ -680,6 +689,20 @@ typedef struct multisense_deviceinfo_t
     uint8_t chksum;        /* exclusive-or checksum for the message                */
 } multiSenseDeviceInfoMsg;
 
+// https://github.com/JMRI/JMRI/blob/master/java/src/jmri/jmrix/loconet/messageinterp/LocoNetMessageInterpret.java#L2419
+typedef struct multisense_transponder_long_t {
+    uint8_t command;
+    uint8_t length;
+    uint8_t msl_i;
+    uint8_t blk_l;
+    uint8_t ad_h;
+    uint8_t ad_l;
+    uint8_t rcdv_h;
+    uint8_t rcdv_l;
+    uint8_t chksum;
+} multiSenseTranspLongMsg;
+
+
 typedef union
 {
     locoAdrMsg				la;
@@ -707,6 +730,7 @@ typedef union
     UhlenbrockMsg			ub;
     AnalogIoMsg				anio;
     multiSenseTranspMsg		mstr;
+    multiSenseTranspLongMsg mstrl;
     multiSenseDeviceInfoMsg	msdi;
     uint8_t					data[16];
     uint8_t length() const
@@ -740,6 +764,7 @@ typedef union
 #define OPC_SW_ACK        0xbd
 #define OPC_LOCO_ADR      0xbf
 #define OPC_MULTI_SENSE   0xd0
+#define OPC_MULTI_SENSE_LONG 0xe0
 #define OPC_PEER_XFER     0xe5
 #define OPC_SL_RD_DATA    0xe7
 #define OPC_IMM_PACKET    0xed

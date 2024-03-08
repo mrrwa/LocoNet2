@@ -112,6 +112,7 @@ const char* LocoNetPhy::getStatusStr (LN_STATUS Status)
 uint8_t writeChecksum (LnMsg &msg)
 {
     uint8_t len = msg.length();
+    if (msg.mstrl.command == OPC_MULTI_SENSE_LONG) len = msg.mstrl.length;
     uint8_t ck = 0xFF;
     for (uint8_t index = 0; index < len - 1; index++)
     {
@@ -316,6 +317,58 @@ void sendStationaryInterrogateCommand(LocoNetBus *ln, uint16_t baseAddress) {
 }
 void sendStationaryInterrogateCommand(LocoNetBus *ln) {
     return sendStationaryInterrogateCommand(ln, 1017);
+}
+
+LN_STATUS reportMultiSenseTransponderLong(LocoNetBus *ln,  uint16_t Address, uint16_t railcomAddress, bool present, bool direction) {
+    LnMsg SendPacket;
+
+    SendPacket.mstrl.command = OPC_MULTI_SENSE_LONG;
+    SendPacket.mstrl.length = 0x09;
+
+    // board address = blk_l + (msl_i & 0x1F << 7) + 1
+    if (Address == 0) Address = 1;
+    Address--;
+    SendPacket.mstrl.blk_l = Address & 0x7F;
+    SendPacket.mstrl.msl_i = (Address >> 7) & 0x1F;
+
+    // append presence flag
+    SendPacket.mstrl.msl_i |= present ? OPC_MULTI_SENSE_PRESENT : OPC_MULTI_SENSE_ABSENT;
+
+    // loco address = ad_l + (ad_h != 0x7D ? ad_h << 7 : 0)
+    SendPacket.mstrl.ad_h = (railcomAddress >> 7) & 0x1F;
+    //if (SendPacket.mstrl.ad_h == 0) SendPacket.mstrl.ad_h = 0x7D;
+    SendPacket.mstrl.ad_l = railcomAddress & 0x7F;
+
+    SendPacket.mstrl.rcdv_h = 0;
+    SendPacket.mstrl.rcdv_l = 0;
+
+    // set direction flag
+    SendPacket.mstrl.rcdv_h |= direction << 6;
+
+    DEBUG("reportMultiSenseTransponderLong(Address=%d, railcomAddress=%d, present=%d, direction=%d) "
+        "cmd=%X length=%X msl_i=%X blk_l=%X ad_h=%X ad_l=%X rcdv_h=%X rcdv_l=%X\n",
+        Address, railcomAddress, present, direction, 
+        SendPacket.mstr.command, SendPacket.mstrl.length,
+        SendPacket.mstrl.msl_i, SendPacket.mstrl.blk_l, 
+        SendPacket.mstrl.ad_h, SendPacket.mstrl.ad_l, 
+        SendPacket.mstrl.rcdv_h, SendPacket.mstrl.rcdv_l);
+    
+    writeChecksum(SendPacket);
+
+    return ln->broadcast(SendPacket);
+}
+
+void LocoNetDispatcher::onMultiSenseTransponderLong(std::function<void(uint16_t, uint16_t, bool, bool)> callback) {
+    onPacket(OPC_MULTI_SENSE_LONG, [callback](const LnMsg *packet) {
+        if (packet->mstrl.length != 0x09) return;
+        if((packet->mstrl.msl_i & OPC_MULTI_SENSE_MSG) == OPC_MULTI_SENSE_ABSENT ||
+        (packet->mstrl.msl_i & OPC_MULTI_SENSE_MSG) == OPC_MULTI_SENSE_PRESENT) {
+        callback(OPC_MULTI_SENSE_LONG_BOARD_ADDRESS(packet->mstrl.msl_i, packet->mstrl.blk_l),
+            OPC_MULTI_SENSE_LONG_LOCO_ADDRESS(packet->mstrl.ad_h, packet->mstrl.ad_l),
+            OPC_MULTI_SENSE_LONG_PRESENCE(packet->mstrl.msl_i),
+            OPC_MULTI_SENSE_LONG_DIRECTION(packet->mstrl.rcdv_h));
+        }
+    });
 }
 
 
@@ -532,6 +585,8 @@ const char * fmtOpcode (uint8_t opc)
         return "LOCO_ADR";
     case  OPC_MULTI_SENSE:
         return "MULTI_SENSE";
+    case  OPC_MULTI_SENSE_LONG: 
+        return "MULTI_SENSE_LONG";
     case  OPC_PEER_XFER:
         return "PEER_XFER";
     case  OPC_SL_RD_DATA:
