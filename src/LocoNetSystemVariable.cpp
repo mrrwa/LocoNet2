@@ -73,7 +73,9 @@ uint8_t LocoNetSystemVariable::readSVStorage(uint16_t Offset)
 
 uint8_t LocoNetSystemVariable::writeSVStorage(uint16_t Offset, uint8_t Value)
 {
-	EEPROM.update(Offset, Value);
+	if(EEPROM.read(Offset) != Value)
+		EEPROM.write(Offset, Value);
+
 	return Value;
 }
 
