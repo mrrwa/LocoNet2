@@ -64,6 +64,18 @@
  *****************************************************************************/
 
 #include "LocoNetSVCV.h"
+#include <EEPROM.h>
+
+uint8_t LocoNetSystemVariable::readSVStorage(uint16_t Offset)
+{
+	return EEPROM.read(Offset);
+}
+
+uint8_t LocoNetSystemVariable::writeSVStorage(uint16_t Offset, uint8_t Value)
+{
+	EEPROM.update(Offset, Value);
+	return Value;
+}
 
 LocoNetSystemVariable::LocoNetSystemVariable(LocoNet &locoNet, uint8_t mfgId, uint8_t devId, uint16_t productId, uint8_t swVersion) :
   _locoNet(locoNet), _mfgId(mfgId), _devId(devId), _productId(productId), _swVersion(swVersion), _deferredProcessingRequired(false), _deferredSrcAddr(0) {
@@ -299,3 +311,4 @@ SV_STATUS LocoNetSystemVariable::doDeferredProcessing() {
   }
   return SV_CONSUMED_OK;
 }
+

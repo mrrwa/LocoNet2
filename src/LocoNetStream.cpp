@@ -90,8 +90,12 @@ void LocoNetStream::process()
 	{
 		DEBUG("process: Process LocoNet Bytes");
 		while(_serialPort->available())
-			consume((uint8_t)_serialPort->read());
-			
+// 			consume((uint8_t)_serialPort->read());
+		{
+			uint8_t inByte = _serialPort->read();
+			DEBUG("process: Byte: %02x", inByte);
+			consume(inByte);
+		}	
 		startCDBackoffTimer();
 	}
 	
