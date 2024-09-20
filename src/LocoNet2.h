@@ -220,6 +220,9 @@ LN_STATUS reportSwitch (LocoNetBus *ln, uint16_t Address);
 LN_STATUS reportSensor (LocoNetBus *ln, uint16_t Address, uint8_t State);
 LN_STATUS reportPower (LocoNetBus *ln, bool state);
 
+void sendStationaryInterrogateCommand(LocoNetBus *ln, uint16_t baseAddress);
+void sendStationaryInterrogateCommand(LocoNetBus *ln);
+
 class LocoNetDispatcher : public LocoNetConsumer
 {
 public:

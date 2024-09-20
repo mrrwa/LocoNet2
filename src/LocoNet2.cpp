@@ -298,6 +298,20 @@ LN_STATUS reportSensor (LocoNetBus *ln,  uint16_t Address, uint8_t State)
     return ln->broadcast (makeMsg (OPC_INPUT_REP, AddrL, AddrH));
 }
 
+void sendStationaryInterrogateCommand(LocoNetBus *ln, uint16_t baseAddress) {
+    requestSwitch(ln, baseAddress, 0, true);
+    requestSwitch(ln, baseAddress + 1, 0, true);
+    requestSwitch(ln, baseAddress + 2, 0, true);
+    requestSwitch(ln, baseAddress + 3, 0, true);
+    requestSwitch(ln, baseAddress, 0, false);
+    requestSwitch(ln, baseAddress + 1, 0, false);
+    requestSwitch(ln, baseAddress + 2, 0, false);
+    requestSwitch(ln, baseAddress + 3, 0, false);
+}
+void sendStationaryInterrogateCommand(LocoNetBus *ln) {
+    return sendStationaryInterrogateCommand(ln, 1017);
+}
+
 
 
 
