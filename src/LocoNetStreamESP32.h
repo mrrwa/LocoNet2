@@ -41,11 +41,16 @@
 #include "soc/uart_struct.h"
 #include "esp32-hal.h"
 
+#if defined(ARDUINO_ESP32_MCU_esp32) || defined(ARDUINO_ESP32_MCU_esp32c3) || defined(ARDUINO_ESP32_MCU_esp32s3)
+#else
+  #error "Unsupported ESP32 Archutecture. Check the ESP32 platform.txt file to ensure every occurance of '-DARDUINO_PARTITION_{build.partitions}' is followed by '-DARDUINO_ESP32_MCU_{build.mcu}'. If not then edit the ESP32 platform.txt so it is" 
+#endif
+
 // The following line is fron the ESP32 SDK file: Arduino15/packages/esp32/hardware/esp32/2.0.4/tools/sdk/esp32/include/hal/esp32/include/hal/uart_ll.h
 #if defined(ARDUINO_ESP32_MCU_esp32)
   #define UART_LL_GET_HW(num) (((num) == 0) ? (&UART0) : (((num) == 1) ? (&UART1) : (&UART2)))
   
-#elif defined(ARDUINO_ESP32_MCU_esp32c3)
+#elif defined(ARDUINO_ESP32_MCU_esp32c3) || defined(ARDUINO_ESP32_MCU_esp32s3)
   #define UART_LL_GET_HW(num) (((num) == 0) ? (&UART0) : (&UART1))
 #endif
 
@@ -73,13 +78,12 @@ class LocoNetStreamESP32: public LocoNetStream {
 		{
 			uart_dev_t *hw = UART_LL_GET_HW(_uart_nr);		 	
 
- 		#if defined(ARDUINO_ESP32_MCU_esp32c3)    
+ 		#if defined(ARDUINO_ESP32_MCU_esp32c3) || defined(ARDUINO_ESP32_MCU_esp32s3)    
 		  	return hw->fsm_status.st_urx_out != 0;
 			
  		#elif defined(ARDUINO_ESP32_MCU_esp32)  
  			return hw->status.st_urx_out != 0;
- 		#else
- 		#error "Unsupported ESP32 Archutecture"
+
  		#endif
 		};
 
