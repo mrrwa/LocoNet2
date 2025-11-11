@@ -29,7 +29,7 @@
  * 	to use this code, algorithm or these message formats outside of
  * 	MRRwA, please contact Digitrax Inc, for specific permission.
  *
- * 	Note: The sale any LocoNet device hardware (including bare PCB's) that
+ * 	Note: The sale any LocoNet device hardware (including bare PCB's' that
  * 	uses this or any other LocoNet software, requires testing and certification
  * 	by Digitrax Inc. and will be subject to a licensing agreement.
  *
@@ -40,7 +40,7 @@
  * 	IMPORTANT:
  *
  * 	Some of the message formats used in this code are Copyright Uhlenbrock Elektronik GmbH
- * 	and are used with permission as part of the MRRwA (previously EmbeddedLocoNet) project.
+ * 	and are used with permission as part of the MRRwA (previously EmbeddedLocoNet' project.
  *  That permission does not extend to uses in other software products. If you wish
  * 	to use this code, algorithm or these message formats outside of
  * 	MRRwA, please contact Copyright Uhlenbrock Elektronik GmbH, for specific permission.
@@ -132,9 +132,9 @@ void LocoNetThrottle::updateState (TH_STATE State, uint8_t ForceNotify)
     {
         TH_STATE PrevState = _state;
         _state = State;
-        if (throttleStateCallback)
+        if (stateCallback)
         {
-            throttleStateCallback (this, State, PrevState);
+            stateCallback (this, State, PrevState);
         }
     }
 }
@@ -144,9 +144,9 @@ void LocoNetThrottle::updateStatus1 (uint8_t Status, uint8_t ForceNotify)
     if (ForceNotify || _status1 != Status)
     {
         _status1 = Status;
-        if (throttleSlotStateCallback)
+        if (slotStateCallback)
         {
-            throttleSlotStateCallback (this, Status);
+            slotStateCallback (this, Status);
         }
         updateState (Status & LOCO_IN_USE ? TH_ST_IN_USE : TH_ST_FREE, ForceNotify);
     }
@@ -256,9 +256,9 @@ void LocoNetThrottle::processMessage (const lnMsg *LnPacket)
                 if (_state == TH_ST_SLOT_RESUME && _throttleId != (uint16_t) ( (LnPacket->sd.id2 << 7) + LnPacket->sd.id1))
                 {
                     updateState (TH_ST_FREE, 1);
-                    if (throttleErrorCallback)
+                    if (errorCallback)
                     {
-                        throttleErrorCallback (this, TH_ER_NO_LOCO);
+                        errorCallback (this, TH_ER_NO_LOCO);
                     }
                 }
                 else
@@ -320,8 +320,8 @@ void LocoNetThrottle::processMessage (const lnMsg *LnPacket)
                     }
                     else
                     {
-                        if (throttleErrorCallback)
-                            throttleErrorCallback (this, TH_ER_SLOT_IN_USE);
+                        if (errorCallback)
+                            errorCallback (this, TH_ER_SLOT_IN_USE);
                         updateState (TH_ST_FREE, 1);
                     }
                 }
@@ -346,8 +346,8 @@ void LocoNetThrottle::processMessage (const lnMsg *LnPacket)
                     }
                     else
                     {
-                        if (throttleErrorCallback)
-                            throttleErrorCallback (this, TH_ER_NO_LOCO);
+                        if (errorCallback)
+                            errorCallback (this, TH_ER_NO_LOCO);
                         updateState (TH_ST_FREE, 1);
                     }
                 }
@@ -398,13 +398,13 @@ void LocoNetThrottle::processMessage (const lnMsg *LnPacket)
     {
         if (_state >= TH_ST_ACQUIRE && _state <= TH_ST_SLOT_MOVE)
         {
-            if (LnPacket->lack.opcode == (OPC_MOVE_SLOTS & 0x7F) && throttleErrorCallback)
+            if (LnPacket->lack.opcode == (OPC_MOVE_SLOTS & 0x7F) && errorCallback)
             {
-                throttleErrorCallback (this, TH_ER_NO_LOCO);
+                errorCallback (this, TH_ER_NO_LOCO);
             }
-            if (LnPacket->lack.opcode == (OPC_LOCO_ADR & 0x7F) && throttleErrorCallback)
+            if (LnPacket->lack.opcode == (OPC_LOCO_ADR & 0x7F) && errorCallback)
             {
-                throttleErrorCallback (this, TH_ER_NO_SLOTS);
+                errorCallback (this, TH_ER_NO_SLOTS);
             }
 
             updateState (TH_ST_FREE, 1);
@@ -428,9 +428,9 @@ TH_ERROR LocoNetThrottle::setAddress (uint16_t Address)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_BUSY);
+        errorCallback (this, TH_ER_BUSY);
     }
     return TH_ER_BUSY;
 }
@@ -446,8 +446,8 @@ TH_ERROR LocoNetThrottle::stealAddress (uint16_t Address)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
-        throttleErrorCallback (this, TH_ER_BUSY);
+    if (errorCallback)
+        errorCallback (this, TH_ER_BUSY);
     return TH_ER_BUSY;
 }
 
@@ -464,9 +464,9 @@ TH_ERROR LocoNetThrottle::resumeAddress (uint16_t Address, uint8_t LastSlot)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_BUSY);
+        errorCallback (this, TH_ER_BUSY);
     }
     return TH_ER_BUSY;
 }
@@ -482,8 +482,8 @@ TH_ERROR LocoNetThrottle::freeAddress (void)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
-        throttleErrorCallback (this, TH_ER_NOT_SELECTED);
+    if (errorCallback)
+        errorCallback (this, TH_ER_NOT_SELECTED);
     return TH_ER_NOT_SELECTED;
 }
 
@@ -499,9 +499,9 @@ TH_ERROR LocoNetThrottle::freeAddressForce (uint16_t Address)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_BUSY);
+        errorCallback (this, TH_ER_BUSY);
     }
     return TH_ER_BUSY;
 }
@@ -515,8 +515,8 @@ TH_ERROR LocoNetThrottle::dispatchAddress (void)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
-        throttleErrorCallback (this, TH_ER_NOT_SELECTED);
+    if (errorCallback)
+        errorCallback (this, TH_ER_NOT_SELECTED);
     return TH_ER_NOT_SELECTED;
 }
 
@@ -531,9 +531,9 @@ TH_ERROR LocoNetThrottle::dispatchAddress (uint16_t Address)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_BUSY);
+        errorCallback (this, TH_ER_BUSY);
     }
     return TH_ER_BUSY;
 }
@@ -547,9 +547,9 @@ TH_ERROR LocoNetThrottle::acquireAddress (void)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_BUSY);
+        errorCallback (this, TH_ER_BUSY);
     }
     return TH_ER_BUSY;
 }
@@ -575,8 +575,8 @@ TH_ERROR LocoNetThrottle::idleAddress (void)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
-        throttleErrorCallback (this, TH_ER_NOT_SELECTED);
+    if (errorCallback)
+        errorCallback (this, TH_ER_NOT_SELECTED);
     return TH_ER_NOT_SELECTED;
 }
 
@@ -608,9 +608,9 @@ TH_ERROR LocoNetThrottle::setSpeed (uint8_t Speed)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_NOT_SELECTED);
+        errorCallback (this, TH_ER_NOT_SELECTED);
     }
     return TH_ER_NOT_SELECTED;
 }
@@ -630,9 +630,9 @@ TH_ERROR LocoNetThrottle::setDirection (uint8_t Direction)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_NOT_SELECTED);
+        errorCallback (this, TH_ER_NOT_SELECTED);
     }
     return TH_ER_NOT_SELECTED;
 }
@@ -687,9 +687,9 @@ TH_ERROR LocoNetThrottle::setFunction (uint8_t Function, uint8_t Value)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_NOT_SELECTED);
+        errorCallback (this, TH_ER_NOT_SELECTED);
     }
     return TH_ER_NOT_SELECTED;
 }
@@ -702,9 +702,9 @@ TH_ERROR LocoNetThrottle::setDirFunc0to4Direct (uint8_t Value)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_NOT_SELECTED);
+        errorCallback (this, TH_ER_NOT_SELECTED);
     }
     return TH_ER_NOT_SELECTED;
 }
@@ -717,9 +717,9 @@ TH_ERROR LocoNetThrottle::setFunc5to8Direct (uint8_t Value)
         return TH_ER_OK;
     }
 
-    if (throttleErrorCallback)
+    if (errorCallback)
     {
-        throttleErrorCallback (this, TH_ER_NOT_SELECTED);
+        errorCallback (this, TH_ER_NOT_SELECTED);
     }
     return TH_ER_NOT_SELECTED;
 }

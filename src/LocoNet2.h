@@ -67,7 +67,7 @@
 
 #include <map>
 
-#include <Embedded_Template_Library.h> // Mandatory for Arduino IDE only
+// #include <Embedded_Template_Library.h> // Mandatory for Arduino IDE only
 #include <etl/vector.h>
 #include <vector>
 #include <functional>

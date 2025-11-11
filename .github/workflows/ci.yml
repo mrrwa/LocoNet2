@@ -1,0 +1,26 @@
+name: PlatformIO CI
+
+on:
+  push:
+  pull_request:
+    branches: [ development ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install -U platformio
+    - name: Install project dependencies
+      run: pio lib install
+    - name: Copy example sketch
+      run: cp examples/Basic-Listener-ESP32/Basic-Listener-ESP32.ino src/
+    - name: Build project
+      run: pio run

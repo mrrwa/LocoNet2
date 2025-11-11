@@ -54,42 +54,42 @@ public:
     /**
      * Registers a callback for when the address for this throttle changes
      */
-    void onAddressChange (std::function<void (LocoNetThrottle *, uint16_t, uint16_t) > callback)
+    void addressChange (std::function<void (LocoNetThrottle *, uint16_t, uint16_t) > callback)
     {
         addressChangeCallback = callback;
     }
     /**
      * Registers a callback for when the speed for this throttle changes
      */
-    void onSpeedChange (std::function<void (LocoNetThrottle *, uint8_t) > callback)
+    void speedChange (std::function<void (LocoNetThrottle *, uint8_t) > callback)
     {
         speedChangeCallback = callback;
     }
     /**
      * Registers a callback for when the direction for this throttle changes
      */
-    void onDirectionChange (std::function<void (LocoNetThrottle *, uint8_t) > callback)
+    void directionChange (std::function<void (LocoNetThrottle *, uint8_t) > callback)
     {
         directionChangeCallback = callback;
     }
     /**
      * Registers a callback for when a function for this throttle changes
      */
-    void onFunctionChange (std::function<void (LocoNetThrottle *, uint8_t, bool) > callback)
+    void functionChange (std::function<void (LocoNetThrottle *, uint8_t, bool) > callback)
     {
         functionChangeCallback = callback;
     }
     /**
      * Registers a callback for when this throttle changes slots
      */
-    void onSlotStateChange (std::function<void (LocoNetThrottle *, uint8_t) > callback)
+    void slotStateChange (std::function<void (LocoNetThrottle *, uint8_t) > callback)
     {
         slotStateCallback = callback;
     }
     /**
      * Registers a callback for when a this throttle has an error
      */
-    void onError (std::function<void (LocoNetThrottle *, TH_ERROR) > callback)
+    void error (std::function<void (LocoNetThrottle *, TH_ERROR) > callback)
     {
         errorCallback = callback;
     }
@@ -97,7 +97,7 @@ public:
      * Registers a callback for when this throttle changes status
      *                                                             Old Status  New Status
      */
-    void onThrottleStateChange (std::function<void (LocoNetThrottle *, TH_STATE, TH_STATE) > callback)
+    void throttleStateChange (std::function<void (LocoNetThrottle *, TH_STATE, TH_STATE) > callback)
     {
         stateCallback = callback;
     }
@@ -105,7 +105,7 @@ public:
      * Registers a callback for when this throttle speed steps changes status
      *                                                             Old Status  New Status
      */
-    void onThrottleSpeedStepsChange (std::function<void (LocoNetThrottle *, TH_SPEED_STEPS) > callback)
+    void throttleSpeedStepsChange (std::function<void (LocoNetThrottle *, TH_SPEED_STEPS) > callback)
     {
         speedStepsChangeCallback = callback;
     }
