@@ -75,6 +75,7 @@
 #include "ln_opc.h"
 #include "LocoNetMessageBuffer.h"
 #include "Bus.h"
+#include "LocoNetCVAccess.h"
 
 // #if defined(ARDUINO_ARCH_AVR)
 // 	#include "LocoNetAvrICP.h"
