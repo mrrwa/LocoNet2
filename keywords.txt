@@ -2,6 +2,7 @@
 
 LocoNetClass				KEYWORD1
 LocoNet						KEYWORD1
+LocoNetTurnout              KEYWORD1
 LN_STATUS					KEYWORD1
 LnBuf						KEYWORD1
 LnBufStats
