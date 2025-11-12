@@ -92,6 +92,7 @@ public:
     void onCVWrite(std::function<int8_t(uint16_t, uint16_t, uint16_t)> callback);
 
 private:
+    void processMessage(const lnMsg* rxPacket);
     int8_t cvRead(uint16_t dev, uint16_t cv, uint16_t& val);
     int8_t cvWrite(uint16_t dev, uint16_t cv, uint16_t val);
 
