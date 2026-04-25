@@ -413,7 +413,7 @@ void LocoNetDispatcher::onPowerChange (std::function<void (bool) > callback)
         DEBUG ("Power ON");
         callback (true);
     });
-    onPacket (OPC_GPON, [callback] (const LnMsg *packet)
+    onPacket (OPC_GPOFF, [callback] (const LnMsg *packet)
     {
         DEBUG ("Power OFF");
         callback (false);
