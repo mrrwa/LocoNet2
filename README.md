@@ -21,6 +21,20 @@ Upon receiving a LocoNet message from outside world, the source classes send mes
 
 `LocoNet` class is now an alias for `LocoNetDispatcher`. Existing utility classes (`LocoNetThrottle`, `LocoNetFastClock` etc) still use `LocoNet` class and have not changed much. Probably they will work with minor modifications.
 
+## Configuration Variable (CV) Access
+
+The `LocoNetCVAccess` class provides support for reading and writing Configuration Variables (CVs) using peer-to-peer LocoNet messages. This is a common way for LocoNet devices to be configured.
+
+To use it, create an instance of `LocoNetCVAccess`, passing your `LocoNet` object to the constructor. Then, register callbacks for CV read and write requests:
+
+```cpp
+LocoNetCVAccess cvAccess(locoNet);
+cvAccess.onCvRead(myReadCallback);
+cvAccess.onCvWrite(myWriteCallback);
+```
+
+For a complete example, see the `CV-Access-ESP32` sketch in the `examples` directory.
+
 Developers:
    Use of the supplied git pre-commit hook is encouraged.  This will require installation of the 'astyle' package for formatting source file.
    See http://astyle.sourceforge.net for details on this package.
