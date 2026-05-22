@@ -66,8 +66,8 @@
 #pragma once
 
 #include <map>
-#ifdef ARDUINO
-#include <Embedded_Template_Library.h> // Mandatory for Arduino IDE only
+#if defined(ARDUINO) && __has_include(<Embedded_Template_Library.h>)
+  #include <Embedded_Template_Library.h> // Mandatory for Arduino IDE only
 #endif
 #include <etl/vector.h>
 #include <vector>
