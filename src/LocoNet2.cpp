@@ -124,7 +124,7 @@ uint8_t writeChecksum (LnMsg &msg)
 LN_STATUS LocoNetPhy::send (LnMsg *pPacket, uint8_t ucPrioDelay)
 {
     LN_STATUS enReturn;
-    bool ucWaitForEnterBackoff;
+    bool seenBackoff;
 
     /* clip maximum prio delay */
     if (ucPrioDelay > LN_BACKOFF_MAX)
@@ -152,7 +152,8 @@ LN_STATUS LocoNetPhy::send (LnMsg *pPacket, uint8_t ucPrioDelay)
     {
         // wait previous traffic and than prio delay and than try tx
         // don't want to abort do/while loop before we did not see the backoff state once
-        ucWaitForEnterBackoff = true;
+        seenBackoff = false;
+
         do
         {
             //DEBUG("calling sendLocoNetPacketTry(%p, %d, %d) attempt %d", packet, packetLen, ucPrioDelay, ucTry);
@@ -169,20 +170,25 @@ LN_STATUS LocoNetPhy::send (LnMsg *pPacket, uint8_t ucPrioDelay)
             if (enReturn == LN_PRIO_BACKOFF)
             {
                 // now entered backoff -> next state != LN_BACKOFF is worth incrementing the try counter
-                ucWaitForEnterBackoff = false;
+                seenBackoff = true;
+            } else {
+                if(seenBackoff) {
+                    // first non-backoff result after a backoff ==> break loop and increment try
+                    break;
+                }
             }
-            //break;
         }
-        while ( (enReturn == LN_CD_BACKOFF) ||                              // waiting CD backoff
-                (enReturn == LN_COLLISION) ||                           	// waiting for the collision to expire
-                (enReturn == LN_PRIO_BACKOFF) ||                           // waiting master+prio backoff
-                ( (enReturn == LN_NETWORK_BUSY) && ucWaitForEnterBackoff)); // or within any traffic unfinished
+        while ( (enReturn == LN_CD_BACKOFF) ||                     // waiting CD backoff
+                (enReturn == LN_COLLISION) ||                      // waiting for the collision to expire
+                (enReturn == LN_PRIO_BACKOFF) ||                   // waiting master+prio backoff
+                ( (enReturn == LN_NETWORK_BUSY) && !seenBackoff)); // or within any traffic unfinished
         // failed -> next try going to higher prio = smaller prio delay
         if (ucPrioDelay > LN_BACKOFF_MIN)
         {
             ucPrioDelay--;
         }
     }
+
     txStats.txErrors++;
     return LN_RETRY_ERROR;
 }

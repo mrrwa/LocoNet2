@@ -21,7 +21,7 @@ LN_STATUS LocoNetStream::sendLocoNetPacketTry (uint8_t *packetData, uint8_t pack
 
     else if (_state == LN_COLLISION && hasCollisionTimerExpired())
     {
-        _state = LN_CD_BACKOFF;
+        startCDBackoffTimer();
     }
 
     if (_state != LN_IDLE)
@@ -48,6 +48,11 @@ LN_STATUS LocoNetStream::sendLocoNetPacketTry (uint8_t *packetData, uint8_t pack
             while (inByte == -1 and ( (millis() - startMillis) < 2))
                 inByte = _serialPort->read();
 
+            if (inByte == -1) {
+                DEBUG ("sendLocoNetPacketTry: Did not receive echo");
+                // hardware problem in LocoNet transiever
+                return LN_UNKNOWN_ERROR;
+            }
             if (inByte != *packetData)
             {
                 DEBUG ("sendLocoNetPacketTry: Collision Detected  Tx: %0x  Rx: %0x", *packetData, inByte);
@@ -90,7 +95,6 @@ void LocoNetStream::process()
     {
         DEBUG ("process: Process LocoNet Bytes");
         while (_serialPort->available())
-// 			consume((uint8_t)_serialPort->read());
         {
             uint8_t inByte = _serialPort->read();
             DEBUG ("process: Byte: %02x", inByte);
