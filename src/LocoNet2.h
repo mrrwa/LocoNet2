@@ -281,6 +281,12 @@ public:
      */
     void onMultiSenseTransponder (std::function<void (uint16_t, uint8_t, uint16_t, bool) > callback);
 
+    /**
+     * Registers a callback for when a MultiSense Transponder event is triggered
+     *                                                  address   locoaddr  presence direction
+     */
+    void onMultiSenseTransponderLong(std::function<void(uint16_t, uint16_t, bool, bool)> callback);
+
 private:
     LocoNetBus * ln;
     bool processSwitchSensorMessage (LnMsg *lnPacket);
