@@ -89,6 +89,7 @@
 #include <etl/vector.h>
 
 #include <functional>
+#include <vector>  // This is needed for PlatformIO to build
 
 #include "ln_opc.h"
 #include "LocoNetMessageBuffer.h"
