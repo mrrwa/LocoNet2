@@ -66,7 +66,7 @@
 #pragma once
 
 #include <map>
-#if defined(ARDUINO)
+#if defined(ARDUINO) && !defined(PLATFORMIO)
   // The <Embedded_Template_Library.h> try to redefine ARDUINO_BOARD
   // so the preprocessor code below should suppress the warning 
   //
