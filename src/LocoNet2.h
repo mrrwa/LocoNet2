@@ -66,11 +66,11 @@
 #pragma once
 
 #include <map>
-#if defined(ARDUINO) && __has_include(<Embedded_Template_Library.h>)
+#if defined(ARDUINO)
   #include <Embedded_Template_Library.h> // Mandatory for Arduino IDE only
 #endif
 #include <etl/vector.h>
-#include <vector>
+
 #include <functional>
 
 #include "ln_opc.h"
