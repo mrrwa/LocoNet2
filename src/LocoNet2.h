@@ -67,8 +67,25 @@
 
 #include <map>
 #if defined(ARDUINO)
-  #include <Embedded_Template_Library.h> // Mandatory for Arduino IDE only
+  // The <Embedded_Template_Library.h> try to redefine ARDUINO_BOARD
+  // so the preprocessor code below should suppress the warning 
+  //
+  // Save the compiler-injected board name to restore later
+  #ifdef ARDUINO_BOARD
+    #define ORIGINAL_ARDUINO_BOARD ARDUINO_BOARD
+    #undef ARDUINO_BOARD
+  #endif
+
+  #include <Embedded_Template_Library.h>
+
+    // Restore the original board definition
+  #ifdef ORIGINAL_ARDUINO_BOARD
+    #undef ARDUINO_BOARD
+    #define ARDUINO_BOARD ORIGINAL_ARDUINO_BOARD
+  #endif  
+  
 #endif
+
 #include <etl/vector.h>
 
 #include <functional>
