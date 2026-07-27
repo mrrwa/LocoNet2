@@ -19,7 +19,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -U platformio
     - name: Install project dependencies
-      run: ppio pkg install
+      run: pio pkg install
     - name: Copy example sketch
       run: cp examples/Basic-Listener-ESP32/Basic-Listener-ESP32.ino src/
     - name: Build project
