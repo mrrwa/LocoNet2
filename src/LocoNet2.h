@@ -66,30 +66,8 @@
 #pragma once
 
 #include <map>
-#if defined(ARDUINO) && !defined(PLATFORMIO)
-  // The <Embedded_Template_Library.h> try to redefine ARDUINO_BOARD
-  // so the preprocessor code below should suppress the warning 
-  //
-  // Save the compiler-injected board name to restore later
-  #ifdef ARDUINO_BOARD
-    #define ORIGINAL_ARDUINO_BOARD ARDUINO_BOARD
-    #undef ARDUINO_BOARD
-  #endif
-
-  #include <Embedded_Template_Library.h>
-
-    // Restore the original board definition
-  #ifdef ORIGINAL_ARDUINO_BOARD
-    #undef ARDUINO_BOARD
-    #define ARDUINO_BOARD ORIGINAL_ARDUINO_BOARD
-  #endif  
-  
-#endif
-
-#include <etl/vector.h>
-
+#include <vector>
 #include <functional>
-#include <vector>  // This is needed for PlatformIO to build
 
 #include "ln_opc.h"
 #include "LocoNetMessageBuffer.h"
